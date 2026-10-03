@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="agreements" data-title="Agreements">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Agreements</h1><p class="subtle">Record agreement date, stamp duty, registration date, and registration number.</p></div></div>
+    <form class="form" id="agreement-form" data-endpoint="agreements" data-redirect="agreements.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Customer Name<input name="customer" required></label>
+        <label>Unit Number<input name="unit" required></label>
+        <label>Agreement Date<input name="agreementDate" type="date"></label>
+        <label>Stamp Duty<input name="stampDuty"></label>
+        <label>Registration Date<input name="registrationDate" type="date"></label>
+        <label>Registration Number<input name="registrationNumber"></label>
+      </div>
+      <button class="button" type="submit">Save Agreement</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>Unit</th><th>Agreement Date</th><th>Stamp Duty</th><th>Registration Number</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

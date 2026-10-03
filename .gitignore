@@ -1,0 +1,18 @@
+build/
+*.class
+
+# Maven build output
+target/
+
+# Project-local Maven dependency cache
+.m2/
+
+# Runtime logs produced by scripts/run*.ps1
+api.log
+api.err.log
+frontend.log
+frontend.err.log
+
+# Local database and uploaded runtime data
+*.db
+uploads/

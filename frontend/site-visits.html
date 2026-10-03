@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="site-visits" data-title="Site Visits">
+  <div id="shell"><div id="page">
+    <div class="page-header">
+      <div>
+        <h1>Site Visits</h1>
+        <p class="subtle">Book visits, assign executives, track pickup needs, customer feedback, and visit outcome.</p>
+      </div>
+    </div>
+    <form class="form" id="site-visit-form" data-endpoint="site-visits" data-redirect="site-visits.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Customer Name<input name="customer" required></label>
+        <label>Visit Date<input name="visitDate" type="date" data-default="today"></label>
+        <label>Visit Time<input name="visitTime" type="time" data-default="time"></label>
+        <label>Pickup Required?
+          <select name="pickupRequired"><option>No</option><option>Yes</option></select>
+        </label>
+        <label>Executive<input name="executive"></label>
+        <label>Status
+          <select name="status"><option>Scheduled</option><option>Visited</option><option>Rescheduled</option><option>No Show</option></select>
+        </label>
+      </div>
+      <label>Customer Feedback<textarea name="feedback" placeholder="Interest level, preferred unit, pricing concerns"></textarea></label>
+      <button class="button" type="submit">Save Site Visit</button>
+    </form>
+    <section class="section table-wrap">
+      <table>
+        <thead><tr><th>Customer</th><th>Visit Slot</th><th>Pickup</th><th>Executive</th><th>Status</th><th>Feedback</th><th>Actions</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="bookings" data-title="Bookings">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Bookings</h1><p class="subtle">Record booking amount, date, selected unit, floor, flat type, and booking status.</p></div></div>
+    <form class="form" id="booking-form" data-endpoint="bookings" data-redirect="bookings.html">
+      <input type="hidden" name="id" value="">
+      <div class="form-grid">
+        <label>Customer Name<input name="customer" required></label>
+        <label>Booking Amount<input name="bookingAmount" required></label>
+        <label>Booking Date<input name="bookingDate" type="date" data-default="today"></label>
+        <label>Unit Number<input name="unit" required></label>
+        <label>Floor<input name="floor"></label>
+        <label>Flat Type<select name="flatType"><option>1 BHK</option><option>2 BHK</option><option>3 BHK</option><option>4 BHK</option></select></label>
+        <label>Status<select name="status"><option>Confirmed</option><option>Pending</option><option>Cancelled</option></select></label>
+      </div>
+      <button class="button" type="submit">Save Booking</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>Unit</th><th>Floor</th><th>Flat Type</th><th>Amount</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js?v=3"></script>
+  <script src="js/ui.js?v=3"></script>
+  <script src="js/pages.js?v=3"></script>
+  <script src="js/app.js?v=3"></script>
+</body>
+</html>

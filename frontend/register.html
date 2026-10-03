@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css?v=6">
+</head>
+<body data-page="register">
+  <main class="login-page">
+    <section class="login-card">
+      <div class="login-mark">SV</div>
+      <h1>Create Account</h1>
+      <p class="subtle">Create an Employee or Agent account.</p>
+      <div id="register-message"></div>
+      <form class="form" id="register-form">
+        <label>Full Name<input name="name" required></label>
+        <label>Mobile Number<input name="mobile" required></label>
+        <label>Email<input name="email" type="email" required></label>
+        <label>Role<select name="role">
+          <option value="EMPLOYEE" selected>Employee</option>
+          <option value="AGENT">Agent</option>
+        </select></label>
+        <label>Password
+          <span class="password-field">
+            <input name="password" type="password" required>
+            <button class="password-toggle" type="button" aria-label="Show password" title="Show password">&#128065;</button>
+          </span>
+        </label>
+        <label>Confirm Password
+          <span class="password-field">
+            <input name="confirmPassword" type="password" required>
+            <button class="password-toggle" type="button" aria-label="Show password" title="Show password">&#128065;</button>
+          </span>
+        </label>
+        <button class="button" type="submit">Create Account</button>
+      </form>
+      <p class="login-note">Only an Admin Owner can create users.</p>
+    </section>
+  </main>
+  <script src="js/api.js?v=5"></script>
+  <script src="js/ui.js?v=5"></script>
+  <script src="js/app.js?v=5"></script>
+</body>
+</html>

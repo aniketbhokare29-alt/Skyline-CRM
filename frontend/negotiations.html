@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="negotiations" data-title="Negotiations">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Negotiations</h1><p class="subtle">Track offered price, discount, special offer, and management approval.</p></div></div>
+    <form class="form" id="negotiation-form" data-endpoint="negotiations" data-redirect="negotiations.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Customer Name<input name="customer" required></label>
+        <label>Unit Number<input name="unit" required></label>
+        <label>Offered Price<input name="offeredPrice" placeholder="6500000"></label>
+        <label>Discount<input name="discount" placeholder="100000"></label>
+        <label>Management Approval<select name="managementApproval"><option>Pending</option><option>Approved</option><option>Rejected</option></select></label>
+      </div>
+      <label>Special Offer<textarea name="specialOffer" placeholder="Parking discount, festival scheme, payment plan"></textarea></label>
+      <button class="button" type="submit">Save Negotiation</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>Unit</th><th>Offered Price</th><th>Discount</th><th>Approval</th><th>Special Offer</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

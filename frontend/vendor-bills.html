@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="vendor-bills" data-title="Vendor Bills">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Vendor Bills</h1><p class="subtle">Track invoice amount, GST, due date, and bill status.</p></div></div>
+    <section class="grid cards" id="cards"></section>
+    <form class="form section" id="vendor-bill-form" data-endpoint="vendor-bills" data-redirect="vendor-bills.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Vendor Name<input name="vendorName" required></label>
+        <label>Invoice Number<input name="invoiceNumber" required></label>
+        <label>Invoice Date<input name="invoiceDate" type="date"></label>
+        <label>Bill Amount<input name="billAmount"></label>
+        <label>GST<input name="gst"></label>
+        <label>Due Date<input name="dueDate" type="date"></label>
+        <label>Status<select name="status"><option>Pending</option><option>Partially Paid</option><option>Fully Paid</option><option>Overdue</option></select></label>
+      </div>
+      <button class="button" type="submit">Save Bill</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Vendor</th><th>Invoice</th><th>Date</th><th>Amount</th><th>Due</th><th>Status</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css?v=6">
+</head>
+<body data-page="login">
+  <main class="login-page">
+    <section class="login-card">
+      <div class="login-mark">SV</div>
+      <h1>Skyline CRM </h1>
+      <p class="subtle">Sign in with your role password to open the CRM workspace.</p>
+      <div id="login-message"></div>
+      <form class="form" id="login-form">
+        <label>Role
+          <select name="role" id="role">
+            <option value="ADMIN_OWNER">Admin Owner</option>
+            <option value="EMPLOYEE">Employee</option>
+            <option value="AGENT">Agent</option>
+          </select>
+        </label>
+        <label>Email<input name="email" type="email" required></label>
+        <label>Password
+          <span class="password-field">
+            <input name="password" type="password" required>
+            <button class="password-toggle" type="button" aria-label="Show password" title="Show password">&#128065;</button>
+          </span>
+        </label>
+        <button class="button" type="submit">Sign In</button>
+      </form>
+      <p class="login-note">User accounts are created by the Admin Owner.</p>
+    </section>
+  </main>
+  <script src="js/api.js?v=5"></script>
+  <script src="js/ui.js?v=5"></script>
+  <script src="js/app.js?v=5"></script>
+</body>
+</html>

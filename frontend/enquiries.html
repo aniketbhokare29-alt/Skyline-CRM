@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="enquiries" data-title="Client Enquiries">
+  <div id="shell"><div id="page">
+    <div class="page-header">
+      <div>
+        <h1>Client Enquiries</h1>
+        <p class="subtle">Capture lead source, contact details, budget, interested property, executive, and status.</p>
+      </div>
+    </div>
+    <form class="form" id="enquiry-form" data-endpoint="enquiries" data-redirect="enquiries.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Customer Name<input name="name" required></label>
+        <label>Mobile Number<input name="mobile" required></label>
+        <label>Email<input name="email" type="email"></label>
+        <label>City<input name="city"></label>
+        <label>Budget<input name="budget" placeholder="Example: 45L - 60L"></label>
+        <label>Interested Property<input name="interestedProperty" placeholder="Example: 2 BHK"></label>
+        <label>Configuration
+          <select name="configuration"><option>1 BHK</option><option>2 BHK</option><option>3 BHK</option><option>4 BHK</option></select>
+        </label>
+        <label>Lead Source
+          <select name="source"><option>Website</option><option>Facebook / Instagram</option><option>Google Ads</option><option>WhatsApp</option><option>Phone Call</option><option>Walk-in</option><option>Referral</option><option>Property Portal</option></select>
+        </label>
+        <label>Sales Executive<input name="executive"></label>
+        <label>Status
+          <select name="status"><option>New Lead</option><option>Qualified</option><option>Not Interested</option><option>Future Prospect</option><option>Wrong Number</option><option>Duplicate</option></select>
+        </label>
+      </div>
+      <button class="button" type="submit">Save Enquiry</button>
+    </form>
+    <section class="section table-wrap">
+      <table>
+        <thead><tr><th>Customer</th><th>Contact</th><th>Source</th><th>Interest</th><th>Budget</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

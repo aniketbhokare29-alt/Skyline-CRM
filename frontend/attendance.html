@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="attendance" data-title="Attendance">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Attendance</h1><p class="subtle">Record daily attendance, overtime, holidays, and absence remarks.</p></div></div>
+    <form class="form" id="attendance-form" data-endpoint="attendance" data-redirect="attendance.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Employee ID<input name="employeeId" required></label>
+        <label>Employee Name<input name="employeeName" required></label>
+        <label>Date<input name="date" type="date" data-default="today"></label>
+        <label>Status<select name="status"><option>Present</option><option>Absent</option><option>Leave</option><option>Holiday</option></select></label>
+        <label>Overtime Hours<input name="overtimeHours" type="number" min="0" step="0.5" value="0"></label>
+      </div>
+      <label>Remarks<textarea name="remarks" placeholder="Late mark, site duty, approved holiday"></textarea></label>
+      <button class="button" type="submit">Save Attendance</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Employee ID</th><th>Name</th><th>Date</th><th>Status</th><th>Overtime</th><th>Remarks</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="purchase-orders" data-title="Purchase Orders">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Purchase Orders</h1><p class="subtle">Create purchase orders for materials, quantities, rates, GST, and total amount.</p></div></div>
+    <form class="form" id="purchase-order-form" data-endpoint="purchase-orders" data-redirect="purchase-orders.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>PO Number<input name="poNumber" required></label>
+        <label>Date<input name="date" type="date" data-default="today"></label>
+        <label>Vendor Name<input name="vendorName" required></label>
+        <label>Material<input name="material"></label>
+        <label>Quantity<input name="quantity"></label>
+        <label>Rate<input name="rate"></label>
+        <label>GST<input name="gst" placeholder="18%"></label>
+        <label>Total Amount<input name="totalAmount"></label>
+      </div>
+      <button class="button" type="submit">Save PO</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>PO</th><th>Date</th><th>Vendor</th><th>Material</th><th>Qty</th><th>GST</th><th>Total</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

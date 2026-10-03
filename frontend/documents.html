@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="documents" data-title="Document Collection">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Document Collection</h1><p class="subtle">Track customer documents needed for booking, loan, and agreement processing.</p></div></div>
+    <form class="form" id="documents-form" data-endpoint="documents" data-redirect="documents.html" enctype="multipart/form-data">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Customer Name<input name="customer" required></label>
+        <label>PAN Card<input name="panCard" type="file" accept="image/*,.pdf"></label>
+        <label>Aadhaar Card<input name="aadhaarCard" type="file" accept="image/*,.pdf"></label>
+        <label>Passport Photo<input name="passportPhoto" type="file" accept="image/*,.pdf"></label>
+        <label>Address Proof<input name="addressProof" type="file" accept="image/*,.pdf"></label>
+        <label>Income Proof<input name="incomeProof" type="file" accept="image/*,.pdf"></label>
+        <label>Bank Statement<input name="bankStatement" type="file" accept="image/*,.pdf"></label>
+      </div>
+      <button class="button" type="submit">Save Documents</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>PAN</th><th>Aadhaar</th><th>Photo</th><th>Address Proof</th><th>Income Proof</th><th>Bank Statement</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="leaves" data-title="Leave Management">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Leave Management</h1><p class="subtle">Track leave requests, dates, type, approval status, and reason.</p></div></div>
+    <form class="form" id="leave-form" data-endpoint="leaves" data-redirect="leaves.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Employee ID<input name="employeeId" required></label>
+        <label>Employee Name<input name="employeeName" required></label>
+        <label>From Date<input name="fromDate" type="date"></label>
+        <label>To Date<input name="toDate" type="date"></label>
+        <label>Leave Type<select name="leaveType"><option>Casual Leave</option><option>Sick Leave</option><option>Paid Leave</option><option>Unpaid Leave</option></select></label>
+        <label>Status<select name="status"><option>Pending</option><option>Approved</option><option>Rejected</option></select></label>
+      </div>
+      <label>Reason<textarea name="reason"></textarea></label>
+      <button class="button" type="submit">Save Leave</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Employee ID</th><th>Name</th><th>Dates</th><th>Type</th><th>Status</th><th>Reason</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

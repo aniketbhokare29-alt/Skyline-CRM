@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="properties" data-title="Property Inventory">
+  <div id="shell"><div id="page">
+    <div class="page-header">
+      <div>
+        <h1>Property Inventory</h1>
+        <p class="subtle">Maintain unit availability with wing, floor, type, area, price, parking, and amenities.</p>
+      </div>
+    </div>
+    <form class="form" id="property-form" data-endpoint="properties" data-redirect="properties.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Unit Number<input name="unit" required></label>
+        <label>Wing<input name="wing" required></label>
+        <label>Floor<input name="floor" required></label>
+        <label>Flat Type<select name="flatType"><option>1 BHK</option><option>2 BHK</option><option>3 BHK</option><option>4 BHK</option></select></label>
+        <label>Carpet / Built-up Area<input name="area" placeholder="650 / 850 sq ft"></label>
+        <label>Price<input name="price" placeholder="6500000"></label>
+        <label>Parking<select name="parking"><option>Yes</option><option>No</option></select></label>
+        <label>Availability<select name="availability"><option>Available</option><option>Booked</option><option>Sold</option></select></label>
+      </div>
+      <label>Amenities<textarea name="amenities" placeholder="Lift, security, garden, clubhouse"></textarea></label>
+      <button class="button" type="submit">Save Property</button>
+    </form>
+    <section class="section table-wrap">
+      <table>
+        <thead><tr><th>Unit</th><th>Wing</th><th>Floor</th><th>Type</th><th>Area</th><th>Price</th><th>Availability</th><th>Actions</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

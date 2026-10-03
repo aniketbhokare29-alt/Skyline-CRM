@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="support" data-title="Customer Support">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Customer Support</h1><p class="subtle">Log after-sales requests for maintenance, complaints, documentation, service requests, and referrals.</p></div></div>
+    <form class="form" id="support-form" data-endpoint="support" data-redirect="support.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Customer Name<input name="customer" required></label>
+        <label>Unit Number<input name="unit"></label>
+        <label>Category<select name="category"><option>Maintenance</option><option>Complaint</option><option>Service Request</option><option>Documentation</option><option>Referral</option></select></label>
+        <label>Priority<select name="priority"><option>Normal</option><option>High</option><option>Urgent</option></select></label>
+        <label>Status<select name="status"><option>Open</option><option>In Progress</option><option>Resolved</option></select></label>
+        <label>Assigned To<input name="assignedTo"></label>
+      </div>
+      <label>Description<textarea name="description" placeholder="Customer issue, requested action, next step"></textarea></label>
+      <button class="button" type="submit">Save Ticket</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>Unit</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Description</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

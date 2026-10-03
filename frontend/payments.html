@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="payments" data-title="Customer Payments">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Customer Payments</h1><p class="subtle">Track installments, total cost, paid amount, pending amount, due dates, and payment notes.</p></div></div>
+    <section class="grid cards" id="cards"></section>
+    <form class="form section" id="payment-form" data-endpoint="payments" data-redirect="payments.html">
+      <input type="hidden" name="id" value="">
+      <div class="form-grid">
+        <label>Customer Name<input name="customer" required></label>
+        <label>Installment Type<select name="installmentType"><option>Booking Amount</option><option>Agreement Payment</option><option>Slab Payment</option><option>Final Payment</option></select></label>
+        <label>Total Cost<input name="totalCost"></label>
+        <label>Paid Amount<input name="paidAmount"></label>
+        <label>Pending Amount<input name="pendingAmount" readonly></label>
+        <label>Due Date<input name="dueDate" type="date"></label>
+      </div>
+      <label>Payment History / Remarks<textarea name="history"></textarea></label>
+      <button class="button" type="submit">Save Payment</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>Installment</th><th>Total Cost</th><th>Paid</th><th>Pending</th><th>Due Date</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js?v=3"></script>
+  <script src="js/ui.js?v=3"></script>
+  <script src="js/pages.js?v=3"></script>
+  <script src="js/app.js?v=3"></script>
+</body>
+</html>

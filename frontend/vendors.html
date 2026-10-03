@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="vendors" data-title="Vendors">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Vendors</h1><p class="subtle">Maintain vendor master records with GST, PAN, contact, bank, and category details.</p></div></div>
+    <form class="form" id="vendor-form" data-endpoint="vendors" data-redirect="vendors.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Vendor Name<input name="vendorName" required></label>
+        <label>Company Name<input name="companyName"></label>
+        <label>GST Number<input name="gstNumber"></label>
+        <label>PAN Number<input name="panNumber"></label>
+        <label>Contact Person<input name="contactPerson"></label>
+        <label>Mobile<input name="mobile"></label>
+        <label>Email<input name="email" type="email"></label>
+        <label>Category<select name="category"><option>Civil Contractor</option><option>Electrical Contractor</option><option>Plumbing Contractor</option><option>Paint Contractor</option><option>Material Supplier</option><option>Lift Supplier</option><option>Security Agency</option><option>Housekeeping</option><option>Architect</option><option>Interior Designer</option><option>Legal Consultant</option></select></label>
+        <label>Bank Details<input name="bankDetails"></label>
+      </div>
+      <label>Address<textarea name="address"></textarea></label>
+      <button class="button" type="submit">Save Vendor</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Vendor</th><th>Company</th><th>Category</th><th>Contact</th><th>GST</th><th>Bank</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

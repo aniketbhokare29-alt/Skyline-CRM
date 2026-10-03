@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="salary" data-title="Salary Processing">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Salary Processing</h1><p class="subtle">Calculate gross salary, deductions, net salary, payment date, mode, and payment status.</p></div></div>
+    <section class="grid cards" id="cards"></section>
+    <form class="form section" id="salary-form" data-endpoint="salary" data-redirect="salary.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Employee ID<input name="employeeId" required></label>
+        <label>Employee Name<input name="employeeName" required></label>
+        <label>Salary Month<input name="salaryMonth" placeholder="September 2026"></label>
+        <label>Basic Salary<input name="basicSalary"></label>
+        <label>HRA<input name="hra"></label>
+        <label>Incentives / Commission<input name="incentives"></label>
+        <label>Bonus<input name="bonus"></label>
+        <label>Deductions<input name="deductions" placeholder="PF + ESIC + tax + advances"></label>
+        <label>Gross Salary<input name="grossSalary"></label>
+        <label>Net Salary<input name="netSalary"></label>
+        <label>Payment Date<input name="paymentDate" type="date"></label>
+        <label>Payment Mode<select name="paymentMode"><option>Bank Transfer</option><option>Cash</option><option>UPI</option><option>Cheque</option></select></label>
+        <label>Payment Status<select name="paymentStatus"><option>Pending</option><option>Paid</option></select></label>
+      </div>
+      <button class="button" type="submit">Save Salary</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Employee</th><th>Month</th><th>Gross</th><th>Deductions</th><th>Net</th><th>Mode</th><th>Status</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

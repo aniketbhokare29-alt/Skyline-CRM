@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="possession" data-title="Possession">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Possession</h1><p class="subtle">Track final inspection, utilities, key handover, possession letter, and delivery status.</p></div></div>
+    <form class="form" id="possession-form" data-endpoint="possession" data-redirect="possession.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Customer Name<input name="customer" required></label>
+        <label>Unit Number<input name="unit" required></label>
+        <label class="checkline"><input name="finalInspection" type="checkbox" value="Yes"> Final Inspection</label>
+        <label class="checkline"><input name="utilityConnection" type="checkbox" value="Yes"> Utility Connection</label>
+        <label class="checkline"><input name="keyHandover" type="checkbox" value="Yes"> Key Handover</label>
+        <label class="checkline"><input name="possessionLetter" type="checkbox" value="Yes"> Possession Letter</label>
+        <label>Status<select name="status"><option>Ready</option><option>Delivered</option></select></label>
+      </div>
+      <label>Remarks<textarea name="remarks" placeholder="Pending work, handover notes, customer confirmation"></textarea></label>
+      <button class="button" type="submit">Save Possession</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>Unit</th><th>Inspection</th><th>Utilities</th><th>Keys</th><th>Letter</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

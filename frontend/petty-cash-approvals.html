@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="petty-cash-approvals" data-title="Petty Cash Approvals">
+  <div id="shell"><div id="page">
+    <div class="page-header"><div><h1>Petty Cash Approvals</h1><p class="subtle">Approve or reject petty cash requests with remarks.</p></div></div>
+    <form class="form" id="petty-cash-approval-form" data-endpoint="petty-cash-approvals" data-redirect="petty-cash-approvals.html">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Requested By<input name="requestedBy" required></label>
+        <label>Approved By<input name="approvedBy"></label>
+        <label>Amount<input name="amount"></label>
+        <label>Status<select name="status"><option>Pending</option><option>Approved</option><option>Rejected</option></select></label>
+      </div>
+      <label>Remarks<textarea name="remarks"></textarea></label>
+      <button class="button" type="submit">Save Approval</button>
+    </form>
+    <section class="section table-wrap"><table><thead><tr><th>Requested By</th><th>Approved By</th><th>Amount</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </div></div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
