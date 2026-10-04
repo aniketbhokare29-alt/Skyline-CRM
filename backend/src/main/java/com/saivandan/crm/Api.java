@@ -52,7 +52,10 @@ public class Api {
         } catch (IllegalArgumentException badRequest) {
             sendJson(exchange, 400, Map.of("error", badRequest.getMessage()));
         } catch (Exception ex) {
-            sendJson(exchange, 500, Map.of("error", "Server error: " + ex.getMessage()));
+            System.err.println("API request failed: " + exchange.getRequestMethod() + " "
+                    + exchange.getRequestURI());
+            ex.printStackTrace(System.err);
+            sendJson(exchange, 500, Map.of("error", "Server error. Check api.err.log for details."));
         }
         return true;
     }

@@ -76,7 +76,10 @@ public class App {
                             "hint", "This server only exposes the JSON API. Open the frontend at http://localhost:5500"
                     )));
         } catch (Exception ex) {
-            send(exchange, 500, "text/plain; charset=utf-8", "Server error: " + ex.getMessage());
+            System.err.println("HTTP request failed: " + exchange.getRequestMethod() + " "
+                    + exchange.getRequestURI());
+            ex.printStackTrace(System.err);
+            send(exchange, 500, "text/plain; charset=utf-8", "Server error. Check api.err.log for details.");
         }
     }
 

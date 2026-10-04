@@ -218,15 +218,25 @@ public class DataStore {
             for (String migration : migrations) {
                 try {
                     stmt.execute(migration);
-                } catch (SQLException ignored) {
-                    // Existing compatible columns do not need another migration.
+                } catch (SQLException migrationError) {
+                    // Existing columns are expected to reject ALTER TABLE. Log all
+                    // other failures so a broken schema cannot be mistaken for a
+                    // healthy startup.
+                    if (!isAlreadyApplied(migrationError)) {
+                        System.err.println("Database migration skipped: " + migration);
+                        migrationError.printStackTrace(System.err);
+                    }
                 }
             }
             normalizeRegisteredUserRoles(stmt);
             try {
                 stmt.execute("ALTER TABLE registeredusers ADD CONSTRAINT chk_registeredusers_role CHECK (role IN ('ADMIN_OWNER', 'EMPLOYEE', 'AGENT'))");
-            } catch (SQLException ignored) {
+            } catch (SQLException constraintError) {
                 // The constraint may already exist, or the server may not enforce CHECK constraints.
+                if (!isAlreadyApplied(constraintError)) {
+                    System.err.println("Could not validate registered user roles.");
+                    constraintError.printStackTrace(System.err);
+                }
             }
             ensureBootstrapUsers(conn);
             syncEmployeeRecords(conn);
@@ -258,6 +268,16 @@ public class DataStore {
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
+    }
+
+    private boolean isAlreadyApplied(SQLException error) {
+        String message = error.getMessage() == null ? "" : error.getMessage().toLowerCase();
+        return message.contains("duplicate column")
+                || message.contains("duplicate key name")
+                || message.contains("already exists")
+                || message.contains("check that column/key exists")
+                || message.contains("duplicate constraint")
+                || message.contains("multiple primary key");
     }
 
     private void normalizeRegisteredUserRoles(Statement stmt) throws SQLException {
@@ -1572,7 +1592,7 @@ public class DataStore {
             new SecureRandom().nextBytes(salt);
             return hashWithSalt(password, Base64.getEncoder().encodeToString(salt));
         } catch (Exception e) {
-            return password;
+            throw new IllegalStateException("Password hashing is unavailable.", e);
         }
     }
 
@@ -1583,7 +1603,7 @@ public class DataStore {
             byte[] hash = md.digest(password.getBytes(StandardCharsets.UTF_8));
             return "sha256$" + saltBase64 + "$" + Base64.getEncoder().encodeToString(hash);
         } catch (Exception e) {
-            return password;
+            throw new IllegalStateException("Password hashing is unavailable.", e);
         }
     }
 
@@ -1648,7 +1668,9 @@ public class DataStore {
                 hashPassword(form.getOrDefault("password", "")),
                 LocalDate.now().toString()
         );
-        try (Connection conn = openConnection()) {
+        Connection conn = null;
+        try {
+            conn = openConnection();
             conn.setAutoCommit(false);
             insertRegisteredUser(conn, obj);
             if (RolePolicy.EMPLOYEE.equals(role)) {
@@ -1656,7 +1678,22 @@ public class DataStore {
             }
             conn.commit();
         } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException rollbackError) {
+                    rollbackError.printStackTrace(System.err);
+                }
+            }
             e.printStackTrace(); throw mapSaveError(e);
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException closeError) {
+                    closeError.printStackTrace(System.err);
+                }
+            }
         }
     }
 
