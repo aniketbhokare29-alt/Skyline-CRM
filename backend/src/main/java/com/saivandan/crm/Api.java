@@ -82,7 +82,7 @@ public class Api {
         }
 
         if (method.equals("GET") && resource.equals("health")) {
-            sendJson(exchange, 200, Map.of("ok", true, "service", "skyline-crm-api", "version", "4", "db", App.STORE.dbPath()));
+            sendJson(exchange, 200, Map.of("ok", true, "service", "skyline-crm-api", "version", "5", "db", App.STORE.dbPath()));
             return;
         }
 
