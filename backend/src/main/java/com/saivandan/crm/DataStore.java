@@ -1430,6 +1430,29 @@ public class DataStore {
         }
     }
 
+    public void addAgent(Map<String, String> form) {
+        String agentId = form.getOrDefault("agentId", "").trim();
+        if (agentId.isBlank()) {
+            agentId = "AGT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        }
+        String email = form.getOrDefault("email", "").trim().toLowerCase();
+        String createdDate = form.getOrDefault("createdDate", "").trim();
+        if (createdDate.isBlank()) {
+            createdDate = LocalDate.now().toString();
+        }
+        String sql = "INSERT INTO agents (agentId, name, mobile, email, role, createdDate) VALUES (?, ?, ?, ?, 'AGENT', ?)";
+        try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, agentId);
+            ps.setString(2, form.getOrDefault("name", "").trim());
+            ps.setString(3, form.getOrDefault("mobile", "").trim());
+            ps.setString(4, email);
+            ps.setString(5, createdDate);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace(); throw mapSaveError(e);
+        }
+    }
+
     public void updateEmployee(long id, Map<String, String> form) {
         String sql = "UPDATE employees SET employeeId = ?, name = ?, department = ?, designation = ?, mobile = ?, email = ?, dateOfJoining = ?, salaryStructure = ?, bankDetails = ?, identityDetails = ?, statutoryDetails = ? WHERE id = ?";
         try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {

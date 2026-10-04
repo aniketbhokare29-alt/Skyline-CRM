@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skyline CRM</title>
+  <link rel="stylesheet" href="css/style.css?v=7">
+</head>
+<body data-page="create-employee" data-title="Create Employee">
+  <div id="shell"><div id="page">
+    <div class="page-header">
+      <div><h1>Create Employee</h1><p class="subtle">Add a complete employee profile to Skyline CRM.</p></div>
+    </div>
+    <section class="section">
+      <h2>Employee Information</h2>
+      <form class="form" data-endpoint="create-employee" data-redirect="dashboard.html" data-success="Employee created successfully.">
+        <div class="form-grid">
+          <label>Employee ID<input name="employeeId" required placeholder="EMP-003"></label>
+          <label>Full Name<input name="name" required></label>
+          <label>Department<input name="department" required placeholder="Sales, Accounts, HR"></label>
+          <label>Designation<input name="designation" required></label>
+          <label>Mobile Number<input name="mobile" type="tel" required></label>
+          <label>Email Address<input name="email" type="email" required></label>
+          <label>Date of Joining<input name="dateOfJoining" type="date" required></label>
+        </div>
+        <h2>Compensation and Details</h2>
+        <div class="form-grid">
+          <label>Salary Structure<textarea name="salaryStructure" rows="3" placeholder="Basic + HRA + Incentive"></textarea></label>
+          <label>Bank Details<textarea name="bankDetails" rows="3"></textarea></label>
+          <label>Identity Details<textarea name="identityDetails" rows="3" placeholder="PAN / Aadhaar details"></textarea></label>
+          <label>Statutory Details<textarea name="statutoryDetails" rows="3" placeholder="PF / ESIC details"></textarea></label>
+        </div>
+        <button class="button" type="submit">Create Employee</button>
+      </form>
+    </section>
+  </div></div>
+  <script src="js/api.js?v=6"></script>
+  <script src="js/ui.js?v=6"></script>
+  <script src="js/pages.js?v=6"></script>
+  <script src="js/app.js?v=6"></script>
+</body>
+</html>

@@ -84,7 +84,8 @@ public class Reports {
                     new NavItem("/payments", "Sales"),
                     new NavItem("/vendor-payments", "Vendor Payments"),
                     new NavItem("/petty-cash", "Petty Cash"),
-                    new NavItem("/register", "Create User"),
+                    new NavItem("/create-employee", "Create Employee"),
+                    new NavItem("/create-agent", "Create Agent"),
                     new NavItem("/finance-dashboard", "Finance Dashboard")
             )));
         }

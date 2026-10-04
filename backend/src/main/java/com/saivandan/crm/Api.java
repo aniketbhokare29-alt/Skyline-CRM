@@ -337,6 +337,8 @@ public class Api {
         m.put("possession", List.of("customer", "unit"));
         m.put("support", List.of("customer", "unit"));
         m.put("employees", List.of("employeeId", "name"));
+        m.put("create-employee", List.of("employeeId", "name", "department", "designation", "mobile", "email", "dateOfJoining"));
+        m.put("create-agent", List.of("name", "mobile", "email", "createdDate"));
         m.put("attendance", List.of("employeeId", "employeeName", "date"));
         m.put("leaves", List.of("employeeId", "employeeName", "fromDate", "toDate"));
         m.put("salary", List.of("employeeId", "employeeName", "salaryMonth"));
@@ -371,6 +373,23 @@ public class Api {
                 }
             }
         }
+
+        if (resource.equals("create-employee") || resource.equals("create-agent")) {
+            String email = form.getOrDefault("email", "").trim();
+            String mobile = form.getOrDefault("mobile", "").trim();
+            if (!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+                sendJson(exchange, 400, Map.of("error", "Enter a valid email address."));
+                return true;
+            }
+            if (!mobile.matches("^[0-9+() -]{7,20}$")) {
+                sendJson(exchange, 400, Map.of("error", "Enter a valid mobile number."));
+                return true;
+            }
+        }
+        if (resource.equals("create-agent") && !"AGENT".equalsIgnoreCase(form.getOrDefault("role", "AGENT"))) {
+            sendJson(exchange, 400, Map.of("error", "Agent role must be AGENT."));
+            return true;
+        }
         
         switch (resource) {
             case "enquiries" -> App.STORE.addEnquiry(form);
@@ -387,6 +406,8 @@ public class Api {
             case "possession" -> App.STORE.addPossession(form);
             case "support" -> App.STORE.addSupportTicket(form);
             case "employees" -> App.STORE.addEmployee(form);
+            case "create-employee" -> App.STORE.addEmployee(form);
+            case "create-agent" -> App.STORE.addAgent(form);
             case "attendance" -> App.STORE.addAttendance(form);
             case "leaves" -> App.STORE.addLeaveRequest(form);
             case "salary" -> App.STORE.addSalaryPayment(form);

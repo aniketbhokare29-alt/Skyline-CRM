@@ -208,7 +208,11 @@ function bindForm(form, endpoint, redirectTo) {
         await Api.post(endpoint, values);
       }
       const role = sessionStorage.getItem('crm_role') || '';
-      location.href = redirectTo + '?role=' + encodeRole(role);
+      const message = form.dataset.success || 'Record saved successfully.';
+      if (form.dataset.success) {
+        alert(message);
+      }
+      location.href = redirectTo + '?role=' + encodeRole(role) + '&message=' + encodeURIComponent(message);
     } catch (err) {
       if (button) {
         button.disabled = false;
