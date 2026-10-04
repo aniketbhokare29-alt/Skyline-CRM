@@ -169,6 +169,7 @@ public class DataStore {
             stmt.execute("CREATE TABLE IF NOT EXISTS leaverequests (employeeId VARCHAR(255), employeeName VARCHAR(255), fromDate VARCHAR(255), toDate VARCHAR(255), leaveType VARCHAR(255), status VARCHAR(255), reason VARCHAR(255))");
             stmt.execute("CREATE TABLE IF NOT EXISTS salarypayments (employeeId VARCHAR(255), employeeName VARCHAR(255), salaryMonth VARCHAR(255), basicSalary VARCHAR(255), hra VARCHAR(255), incentives VARCHAR(255), bonus VARCHAR(255), deductions VARCHAR(255), grossSalary VARCHAR(255), netSalary VARCHAR(255), paymentDate VARCHAR(255), paymentMode VARCHAR(255), paymentStatus VARCHAR(255))");
             stmt.execute("CREATE TABLE IF NOT EXISTS registeredusers (name VARCHAR(255), mobile VARCHAR(255), email VARCHAR(191) UNIQUE, role VARCHAR(32) NOT NULL DEFAULT 'EMPLOYEE', password VARCHAR(255), createdDate VARCHAR(255))");
+            stmt.execute("CREATE TABLE IF NOT EXISTS agents (id " + pk + ", agentId VARCHAR(191), name VARCHAR(255), mobile VARCHAR(255), email VARCHAR(191), role VARCHAR(32) NOT NULL DEFAULT 'AGENT', createdDate VARCHAR(255))");
             stmt.execute("CREATE TABLE IF NOT EXISTS vendors (vendorName VARCHAR(191), companyName VARCHAR(255), gstNumber VARCHAR(255), panNumber VARCHAR(255), contactPerson VARCHAR(255), mobile VARCHAR(255), email VARCHAR(255), address VARCHAR(255), bankDetails VARCHAR(255), category VARCHAR(255))");
             stmt.execute("CREATE TABLE IF NOT EXISTS purchaseorders (poNumber VARCHAR(191), date VARCHAR(255), vendorName VARCHAR(255), material VARCHAR(255), quantity VARCHAR(255), rate VARCHAR(255), gst VARCHAR(255), totalAmount VARCHAR(255))");
             stmt.execute("CREATE TABLE IF NOT EXISTS vendorbills (vendorName VARCHAR(95), invoiceNumber VARCHAR(95), invoiceDate VARCHAR(255), billAmount VARCHAR(255), gst VARCHAR(255), dueDate VARCHAR(255), status VARCHAR(255))");
@@ -240,10 +241,13 @@ public class DataStore {
             }
             ensureBootstrapUsers(conn);
             syncEmployeeRecords(conn);
+            syncAgentRecords(conn);
             // Natural keys: prevent accidental double entry. IF NOT EXISTS keeps old DBs working.
             for (String idx : new String[]{
                     "CREATE UNIQUE INDEX idx_properties_unit ON properties(unit)",
                     "CREATE UNIQUE INDEX idx_employees_id ON employees(employeeId)",
+                    "CREATE UNIQUE INDEX idx_agents_agent_id ON agents(agentId)",
+                    "CREATE UNIQUE INDEX idx_agents_email ON agents(email)",
                     "CREATE UNIQUE INDEX idx_po_number ON purchaseorders(poNumber)",
                     "CREATE UNIQUE INDEX idx_vendors_name ON vendors(vendorName)",
                     "CREATE UNIQUE INDEX idx_vendorbills_vendor_inv ON vendorbills(vendorName, invoiceNumber)",
@@ -335,6 +339,45 @@ public class DataStore {
                 "",
                 ""
         ));
+    }
+
+    /** Keeps Agent login accounts visible in the dedicated agents table. */
+    private void syncAgentRecords(Connection conn) throws SQLException {
+        String usersSql = "SELECT name, mobile, email, createdDate FROM registeredusers WHERE role = 'AGENT'";
+        try (PreparedStatement users = conn.prepareStatement(usersSql);
+             ResultSet rs = users.executeQuery()) {
+            while (rs.next()) {
+                ensureAgentRecord(conn, rs.getString("name"), rs.getString("mobile"),
+                        rs.getString("email"), rs.getString("createdDate"));
+            }
+        }
+    }
+
+    private void ensureAgentRecord(Connection conn, String name, String mobile, String email,
+                                   String createdDate) throws SQLException {
+        String normalizedEmail = email == null ? "" : email.trim().toLowerCase();
+        if (normalizedEmail.isBlank()) {
+            return;
+        }
+        try (PreparedStatement exists = conn.prepareStatement(
+                "SELECT COUNT(*) FROM agents WHERE lower(email) = ?")) {
+            exists.setString(1, normalizedEmail);
+            try (ResultSet rs = exists.executeQuery()) {
+                if (rs.next() && rs.getInt(1) > 0) {
+                    return;
+                }
+            }
+        }
+        String agentId = "AGT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String sql = "INSERT INTO agents (agentId, name, mobile, email, role, createdDate) VALUES (?, ?, ?, ?, 'AGENT', ?)";
+        try (PreparedStatement insert = conn.prepareStatement(sql)) {
+            insert.setString(1, agentId);
+            insert.setString(2, name == null ? "" : name);
+            insert.setString(3, mobile == null ? "" : mobile);
+            insert.setString(4, normalizedEmail);
+            insert.setString(5, createdDate == null || createdDate.isBlank() ? LocalDate.now().toString() : createdDate);
+            insert.executeUpdate();
+        }
     }
 
     private void bootstrapUser(PreparedStatement ps, String name, String mobile, String email,
@@ -1675,6 +1718,8 @@ public class DataStore {
             insertRegisteredUser(conn, obj);
             if (RolePolicy.EMPLOYEE.equals(role)) {
                 ensureEmployeeRecord(conn, obj.name(), obj.mobile(), obj.email());
+            } else if (RolePolicy.AGENT.equals(role)) {
+                ensureAgentRecord(conn, obj.name(), obj.mobile(), obj.email(), obj.createdDate());
             }
             conn.commit();
         } catch (SQLException e) {
