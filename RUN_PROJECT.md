@@ -63,17 +63,7 @@ Get-Content .\database\business_crud_migration.sql |
 & "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -h 127.0.0.1 -P 3307 -u root -p
 ```
 
-## 6. Copy old SQLite records
-
-Run this only if the old `crm.db` records have not already been migrated:
-
-```powershell
-.\scripts\migrate-sqlite-to-mysql.ps1
-```
-
-Do not run this repeatedly, because it can create duplicate business records.
-
-## 7. Start the project
+## 6. Start the project
 
 In the same terminal where `CRM_DB_PASSWORD` was set, run:
 

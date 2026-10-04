@@ -47,6 +47,6 @@ For a submitted form:
 Browser -> POST /enquiries
 App.java -> readForm()
 App.java -> DataStore.addEnquiry()
-DataStore -> saves to SQLite
+DataStore -> saves to MySQL
 App.java -> redirects to /enquiries
 ```

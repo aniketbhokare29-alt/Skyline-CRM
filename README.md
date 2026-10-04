@@ -82,13 +82,8 @@ The backend reads MySQL settings from environment variables. Defaults are
 `CRM_DB_URL=jdbc:mysql://localhost:3307/skyline_crm`, `CRM_DB_USER=root`, and
 an empty `CRM_DB_PASSWORD`. Set `CRM_DB_PASSWORD` before starting the app.
 
-To create the database schema, run `database/mysql_schema.sql` in MySQL. The
-old `crm.db` file is preserved as a backup. To copy its existing records into
-MySQL after creating the schema, set `CRM_DB_PASSWORD` and run:
-
-```powershell
-.\scripts\migrate-sqlite-to-mysql.ps1
-```
+The application uses MySQL as its only supported runtime database. The schema
+and migrations are stored in the `database` folder.
 
 ## Demo Login Accounts
 
@@ -146,7 +141,6 @@ backend/                     Java 21 + Maven, com.sun.net.httpserver
 scripts/run.ps1              start API and frontend together
 scripts/run-backend.ps1      start the API only
 scripts/run-frontend.ps1     start the static server only
-scripts/migrate-sqlite-to-mysql.ps1  copy preserved crm.db data to MySQL
 database/mysql_schema.sql    MySQL schema matching the existing modules
 database/role_migration.sql  map legacy roles to the three-role model
 database/business_crud_migration.sql  add safe IDs for booking/sales edit/delete

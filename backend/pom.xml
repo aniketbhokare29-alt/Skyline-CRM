@@ -21,13 +21,6 @@
             <artifactId>mysql-connector-j</artifactId>
             <version>9.5.0</version>
         </dependency>
-        <!-- Used only by the one-time SQLite-to-MySQL migration utility. -->
-        <dependency>
-            <groupId>org.xerial</groupId>
-            <artifactId>sqlite-jdbc</artifactId>
-            <version>3.45.2.0</version>
-            <scope>runtime</scope>
-        </dependency>
     </dependencies>
 
     <build>

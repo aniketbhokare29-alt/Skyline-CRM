@@ -16,8 +16,7 @@ Maven builds the Java project and manages external libraries.
 
 - Java source and target version: 21.
 - Project artifact: `skyline-crm`.
-- MySQL Connector/J dependency, plus the SQLite driver used only by the
-  one-time migration utility.
+- MySQL Connector/J dependency for the application database.
 - Main class: `com.saivandan.crm.App`.
 
 ## Useful commands
