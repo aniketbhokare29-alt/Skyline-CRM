@@ -14,11 +14,14 @@
       <div class="form-grid">
         <label>Customer Name<input name="customer" required></label>
         <label>Unit Number<input name="unit" required></label>
+        <label>Original Price<input name="originalPrice"></label>
         <label>Offered Price<input name="offeredPrice" placeholder="6500000"></label>
         <label>Discount<input name="discount" placeholder="100000"></label>
+        <label>Negotiation Date<input name="negotiationDate" type="date" data-default="today"></label>
         <label>Management Approval<select name="managementApproval"><option>Pending</option><option>Approved</option><option>Rejected</option></select></label>
       </div>
       <label>Special Offer<textarea name="specialOffer" placeholder="Parking discount, festival scheme, payment plan"></textarea></label>
+      <label>Remarks<textarea name="remarks"></textarea></label>
       <button class="button" type="submit">Save Negotiation</button>
     </form>
     <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>Unit</th><th>Offered Price</th><th>Discount</th><th>Approval</th><th>Special Offer</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>

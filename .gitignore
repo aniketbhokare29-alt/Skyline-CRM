@@ -16,3 +16,6 @@ frontend.err.log
 # Local database and uploaded runtime data
 *.db
 uploads/
+
+# Generated internship report artifacts
+output/

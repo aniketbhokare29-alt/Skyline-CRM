@@ -17,9 +17,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.math.BigDecimal;
 
 import static com.saivandan.crm.Utils.readForm;
 import static com.saivandan.crm.Utils.send;
@@ -35,6 +37,7 @@ import static com.saivandan.crm.Utils.send;
 public class Api {
 
     static final String SESSION_HEADER = "X-Session-Token";
+    private static final long MAX_UPLOAD_BYTES = 10L * 1024 * 1024;
     private static final Map<String, String> SESSIONS = new ConcurrentHashMap<>();
     // -----------------------------------------------------------------
     // Entry point
@@ -62,6 +65,7 @@ public class Api {
 
     private static void route(HttpExchange exchange, String method, String path) throws IOException {
         String resource = path.equals("/api") ? "" : path.substring("/api/".length());
+        resource = canonicalResource(resource);
         String policyResource = resource.contains("/") ? resource.substring(0, resource.indexOf('/')) : resource;
 
         // ---- public endpoints -------------------------------------
@@ -82,7 +86,7 @@ public class Api {
         }
 
         if (method.equals("GET") && resource.equals("health")) {
-            sendJson(exchange, 200, Map.of("ok", true, "service", "skyline-crm-api", "version", "6", "db", App.STORE.dbPath()));
+            sendJson(exchange, 200, Map.of("ok", true, "service", "skyline-crm-api", "version", "13", "db", App.STORE.dbPath()));
             return;
         }
 
@@ -124,7 +128,7 @@ public class Api {
             return;
         }
 
-        if ((method.equals("PUT") || method.equals("DELETE")) && updateOrDeleteEndpoint(exchange, method, resource)) {
+        if ((method.equals("PUT") || method.equals("DELETE")) && updateOrDeleteEndpoint(exchange, method, resource, role)) {
             return;
         }
 
@@ -155,11 +159,27 @@ public class Api {
         }
 
         // ---- module save endpoints ---------------------------------
-        if (method.equals("POST") && saveEndpoint(exchange, resource)) {
+        if (method.equals("POST") && !RolePolicy.canMutate(role, method, resource)) {
+            sendJson(exchange, 403, Map.of("error", "Your role cannot change this module."));
+            return;
+        }
+        if (method.equals("POST") && saveEndpoint(exchange, resource, role)) {
             return;
         }
 
         sendJson(exchange, 404, Map.of("error", "Page not found"));
+    }
+
+    private static String canonicalResource(String resource) {
+        return switch (resource) {
+            case "property-units" -> "properties";
+            case "loan-processing" -> "loans";
+            case "payment-tracking", "payment-status" -> "payments";
+            case "customer-support" -> "support";
+            case "leave" -> "leaves";
+            case "payroll" -> "salary";
+            default -> resource;
+        };
     }
 
     // -----------------------------------------------------------------
@@ -257,7 +277,7 @@ public class Api {
             case "site-visits" -> items(exchange, App.STORE.getSiteVisits());
             case "negotiations" -> items(exchange, App.STORE.getNegotiations());
             case "bookings" -> items(exchange, App.STORE.getBookings());
-            case "documents" -> items(exchange, App.STORE.getDocumentCollections());
+            case "documents" -> items(exchange, App.STORE.getDocuments());
             case "loans" -> items(exchange, App.STORE.getLoans());
             case "agreements" -> items(exchange, App.STORE.getAgreements());
             case "possession" -> items(exchange, App.STORE.getPossessions());
@@ -330,7 +350,7 @@ public class Api {
         m.put("site-visits", List.of("customer"));
         m.put("negotiations", List.of("customer", "unit"));
         m.put("bookings", List.of("customer", "bookingAmount", "unit"));
-        m.put("documents", List.of("customer"));
+        m.put("documents", List.of("customerId", "customer"));
         m.put("loans", List.of("customer"));
         m.put("agreements", List.of("customer", "unit"));
         m.put("payments", List.of("customer"));
@@ -351,7 +371,7 @@ public class Api {
         return m;
     }
 
-    private static boolean saveEndpoint(HttpExchange exchange, String resource) throws IOException {
+    private static boolean saveEndpoint(HttpExchange exchange, String resource, String role) throws IOException {
         String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
         boolean isMultipart = contentType != null && contentType.startsWith("multipart/form-data");
         Map<String, String> form;
@@ -361,6 +381,7 @@ public class Api {
         } else {
             form = readForm(exchange);
         }
+        form.putIfAbsent("createdBy", role);
         
         // Validate required fields
         List<String> required = REQUIRED_FIELDS.get(resource);
@@ -388,6 +409,11 @@ public class Api {
         }
         if (resource.equals("create-agent") && !"AGENT".equalsIgnoreCase(form.getOrDefault("role", "AGENT"))) {
             sendJson(exchange, 400, Map.of("error", "Agent role must be AGENT."));
+            return true;
+        }
+        String workflowError = validateWorkflow(resource, form, role);
+        if (workflowError != null) {
+            sendJson(exchange, 400, Map.of("error", workflowError));
             return true;
         }
         
@@ -425,7 +451,7 @@ public class Api {
         return true;
     }
 
-    private static boolean updateOrDeleteEndpoint(HttpExchange exchange, String method, String resource) throws IOException {
+    private static boolean updateOrDeleteEndpoint(HttpExchange exchange, String method, String resource, String role) throws IOException {
         String[] parts = resource.split("/", -1);
         if (parts.length != 2 || (!parts[0].equals("bookings") && !parts[0].equals("payments") && !parts[0].equals("enquiries") && !parts[0].equals("qualification") && !parts[0].equals("followups") && !parts[0].equals("site-visits") && !parts[0].equals("properties") && !parts[0].equals("negotiations") && !parts[0].equals("loans") && !parts[0].equals("agreements") && !parts[0].equals("possession") && !parts[0].equals("support") && !parts[0].equals("vendors") && !parts[0].equals("purchase-orders") && !parts[0].equals("vendor-bills") && !parts[0].equals("vendor-payments") && !parts[0].equals("documents") && !parts[0].equals("employees") && !parts[0].equals("attendance") && !parts[0].equals("leaves") && !parts[0].equals("salary") && !parts[0].equals("petty-cash") && !parts[0].equals("petty-cash-approvals"))) {
             return false;
@@ -435,6 +461,14 @@ public class Api {
             id = Long.parseLong(parts[1]);
         } catch (NumberFormatException ex) {
             sendJson(exchange, 400, Map.of("error", "A valid record id is required."));
+            return true;
+        }
+        if (method.equals("DELETE") && !RolePolicy.canDelete(role, parts[0])) {
+            sendJson(exchange, 403, Map.of("error", "Delete is not permitted for this role."));
+            return true;
+        }
+        if (method.equals("PUT") && !RolePolicy.canMutate(role, method, parts[0])) {
+            sendJson(exchange, 403, Map.of("error", "Update is not permitted for this role."));
             return true;
         }
         if (method.equals("DELETE")) {
@@ -455,7 +489,7 @@ public class Api {
                 case "purchase-orders" -> App.STORE.deletePurchaseOrder(id);
                 case "vendor-bills" -> App.STORE.deleteVendorBill(id);
                 case "vendor-payments" -> App.STORE.deleteVendorPayment(id);
-                case "documents" -> App.STORE.deleteDocumentCollection(id);
+                case "documents" -> App.STORE.deleteDocument(id);
                 case "employees" -> App.STORE.deleteEmployee(id);
                 case "attendance" -> App.STORE.deleteAttendance(id);
                 case "leaves" -> App.STORE.deleteLeaveRequest(id);
@@ -467,6 +501,16 @@ public class Api {
             return true;
         }
         Map<String, String> form = readForm(exchange);
+        form.putIfAbsent("createdBy", role);
+        String workflowError = validateWorkflow(parts[0], form, role);
+        if (workflowError != null) {
+            sendJson(exchange, 400, Map.of("error", workflowError));
+            return true;
+        }
+        if ("negotiations".equals(parts[0]) && !RolePolicy.canApprove(role)) {
+            form.put("managementApproval", "Pending");
+            form.put("approvalStatus", "PENDING");
+        }
         switch (parts[0]) {
             case "bookings" -> App.STORE.updateBooking(id, form);
             case "payments" -> App.STORE.updateCustomerPayment(id, form);
@@ -484,7 +528,7 @@ public class Api {
             case "purchase-orders" -> App.STORE.updatePurchaseOrder(id, form);
             case "vendor-bills" -> App.STORE.updateVendorBill(id, form);
             case "vendor-payments" -> App.STORE.updateVendorPayment(id, form);
-            case "documents" -> App.STORE.updateDocumentCollection(id, form);
+            case "documents" -> App.STORE.updateDocument(id, form);
             case "employees" -> App.STORE.updateEmployee(id, form);
             case "attendance" -> App.STORE.updateAttendance(id, form);
             case "leaves" -> App.STORE.updateLeaveRequest(id, form);
@@ -496,6 +540,55 @@ public class Api {
         return true;
     }
 
+    private static String validateWorkflow(String resource, Map<String, String> form, String role) {
+        if ("negotiations".equals(resource) && !RolePolicy.canApprove(role)) {
+            form.put("managementApproval", "Pending");
+            form.put("approvalStatus", "PENDING");
+        }
+        if ("documents".equals(resource) && RolePolicy.AGENT.equals(role)
+                && !form.getOrDefault("verificationStatus", "PENDING").equalsIgnoreCase("PENDING")) {
+            return "Agents can upload documents but cannot verify or reject them.";
+        }
+        if ("payments".equals(resource)) {
+            BigDecimal total = decimal(form.get("totalCost"));
+            BigDecimal paid = decimal(form.get("paidAmount"));
+            if (total.signum() < 0 || paid.signum() < 0) return "Payment amounts cannot be negative.";
+            if (paid.compareTo(total) > 0) return "Amount paid cannot exceed total cost.";
+            form.put("pendingAmount", total.subtract(paid).stripTrailingZeros().toPlainString());
+            String status = paid.signum() == 0 ? "PENDING" : paid.compareTo(total) >= 0 ? "PAID" : "PARTIALLY_PAID";
+            form.put("paymentStatus", status);
+        }
+        if ("properties".equals(resource)) {
+            String availability = form.getOrDefault("availability", "AVAILABLE").trim().toUpperCase();
+            if (!Set.of("AVAILABLE", "RESERVED", "SOLD", "BOOKED").contains(availability)) {
+                return "Availability must be AVAILABLE, RESERVED, or SOLD.";
+            }
+            form.put("availability", availability);
+        }
+        if ("bookings".equals(resource)) {
+            BigDecimal amount = decimal(form.get("bookingAmount"));
+            if (amount.signum() < 0) return "Booking amount cannot be negative.";
+            String unit = form.getOrDefault("unit", "").trim();
+            for (var property : App.STORE.getProperties()) {
+                if (property.unit().equalsIgnoreCase(unit)
+                        && Set.of("SOLD", "RESERVED").contains(property.availability().toUpperCase())
+                        && !"CANCELLED".equalsIgnoreCase(form.getOrDefault("status", ""))) {
+                    return "This property unit is already reserved or sold.";
+                }
+            }
+        }
+        return null;
+    }
+
+    private static BigDecimal decimal(String value) {
+        if (value == null || value.isBlank()) return BigDecimal.ZERO;
+        try {
+            return new BigDecimal(value.replace(",", "").trim());
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("Enter valid numeric amounts.");
+        }
+    }
+
     // -----------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------
@@ -504,8 +597,11 @@ public class Api {
         send(exchange, status, "application/json; charset=utf-8", Json.write(body));
     }
 
+    private record UploadedFile(String originalFilename, String contentType, byte[] content) {}
+
     private static Map<String, String> parseMultipartWithFiles(HttpExchange exchange) throws IOException {
         Map<String, String> values = new LinkedHashMap<>();
+        Map<String, UploadedFile> files = new LinkedHashMap<>();
         String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
         String boundary = getBoundary(contentType);
         if (boundary == null) {
@@ -513,12 +609,18 @@ public class Api {
         }
         
         byte[] data = exchange.getRequestBody().readAllBytes();
+        if (data.length > MAX_UPLOAD_BYTES * 6) {
+            throw new IllegalArgumentException("The combined document upload must be smaller than 60 MB.");
+        }
         String body = new String(data, StandardCharsets.ISO_8859_1);
         String delimiter = "--" + boundary;
         
         String[] parts = body.split(Pattern.quote(delimiter));
         for (String part : parts) {
-            if (part.trim().isEmpty() || part.contains("--")) continue;
+            // Do not inspect the whole payload for "--": binary files can
+            // legitimately contain that byte sequence. Only skip the closing
+            // multipart marker itself.
+            if (part.trim().isEmpty() || part.trim().equals("--")) continue;
             
             int headerEnd = part.indexOf("\r\n\r\n");
             if (headerEnd == -1) continue;
@@ -533,13 +635,28 @@ public class Api {
             String filename = extractFilename(headers);
             if (name != null) {
                 if (filename != null && !filename.isEmpty()) {
-                    // Save file
-                    String savedPath = saveFile(name, filename, content.getBytes(StandardCharsets.ISO_8859_1));
-                    values.put(name, savedPath);
+                    byte[] fileContent = content.getBytes(StandardCharsets.ISO_8859_1);
+                    if (fileContent.length > MAX_UPLOAD_BYTES) {
+                        throw new IllegalArgumentException("Each document must be smaller than 10 MB.");
+                    }
+                    files.put(name, new UploadedFile(filename, extractContentType(headers), fileContent));
                 } else {
                     values.put(name, content);
                 }
             }
+        }
+
+        String customerId = values.getOrDefault("customerId", "").trim();
+        if (customerId.isBlank()) customerId = values.getOrDefault("bookingId", "").trim();
+        if (customerId.isBlank()) customerId = values.getOrDefault("customer", "").trim();
+        for (Map.Entry<String, UploadedFile> entry : files.entrySet()) {
+            UploadedFile file = entry.getValue();
+            String savedPath = saveFile(customerId, entry.getKey(), file.originalFilename(), file.content());
+            values.put(entry.getKey(), savedPath);
+            values.put(entry.getKey() + ".originalFileName", file.originalFilename());
+            values.put(entry.getKey() + ".storedFileName", Paths.get(savedPath).getFileName().toString());
+            values.put(entry.getKey() + ".fileType", file.contentType());
+            values.put(entry.getKey() + ".fileSize", String.valueOf(file.content().length));
         }
         return values;
     }
@@ -571,20 +688,50 @@ public class Api {
         return null;
     }
 
-    private static String saveFile(String fieldName, String originalFilename, byte[] content) throws IOException {
-        Path uploadDir = Paths.get("uploads").toAbsolutePath().normalize();
-        if (!Files.exists(uploadDir)) {
-            Files.createDirectories(uploadDir);
+    private static String extractContentType(String headers) {
+        Pattern pattern = Pattern.compile("(?im)^Content-Type:\\s*([^\\r\\n]+)");
+        Matcher matcher = pattern.matcher(headers);
+        return matcher.find() ? matcher.group(1).trim() : "application/octet-stream";
+    }
+
+    private static String saveFile(String customerId, String fieldName, String originalFilename, byte[] content) throws IOException {
+        String safeCustomerId = safePathPart(customerId, "unknown_customer");
+        String category = switch (fieldName) {
+            case "panCard" -> "PAN_CARD";
+            case "aadhaarCard" -> "AADHAAR_CARD";
+            case "passportPhoto" -> "PASSPORT_PHOTO";
+            case "addressProof" -> "ADDRESS_PROOF";
+            case "incomeProof" -> "INCOME_PROOF";
+            case "bankStatement" -> "BANK_STATEMENT";
+            default -> "OTHER";
+        };
+        Path uploadDir = Paths.get("uploads", "customers", safeCustomerId, category)
+                .toAbsolutePath().normalize();
+        Files.createDirectories(uploadDir);
+
+        String cleanFilename = originalFilename.replace('\\', '/');
+        int slash = cleanFilename.lastIndexOf('/');
+        if (slash >= 0) cleanFilename = cleanFilename.substring(slash + 1);
+        cleanFilename = cleanFilename.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (cleanFilename.isBlank() || cleanFilename.equals(".") || cleanFilename.equals("..")) {
+            cleanFilename = fieldName + ".bin";
         }
         String extension = "";
-        int dotIndex = originalFilename.lastIndexOf('.');
+        int dotIndex = cleanFilename.lastIndexOf('.');
         if (dotIndex > 0) {
-            extension = originalFilename.substring(dotIndex);
+            extension = cleanFilename.substring(dotIndex);
         }
-        String savedName = fieldName + "_" + System.currentTimeMillis() + extension;
+        String baseName = dotIndex > 0 ? cleanFilename.substring(0, dotIndex) : cleanFilename;
+        String savedName = baseName + "_" + System.currentTimeMillis() + extension;
         Path filePath = uploadDir.resolve(savedName);
         Files.write(filePath, content);
-        return "/uploads/" + savedName;
+        return "/uploads/customers/" + safeCustomerId + "/" + category + "/" + savedName;
+    }
+
+    private static String safePathPart(String value, String fallback) {
+        String safe = value == null ? "" : value.trim().replaceAll("[^A-Za-z0-9_-]", "_");
+        if (safe.isBlank()) return fallback;
+        return safe.length() > 80 ? safe.substring(0, 80) : safe;
     }
 
     private static void generateSalarySlip(HttpExchange exchange, long id) throws IOException, SQLException {

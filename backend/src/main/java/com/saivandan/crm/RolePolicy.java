@@ -57,13 +57,51 @@ public final class RolePolicy {
             return true;
         }
         if (EMPLOYEE.equals(role)) {
-            return Set.of("enquiries", "followups", "qualification", "bookings", "payments",
-                    "vendor-payments", "petty-cash").contains(resource);
+            return Set.of("enquiries", "followups", "qualification", "properties", "site-visits",
+                    "negotiations", "bookings", "documents", "loans", "agreements", "payments",
+                    "possession", "support").contains(resource);
         }
         if (AGENT.equals(role)) {
-            return Set.of("enquiries", "followups", "qualification", "bookings", "payments")
+            return Set.of("enquiries", "followups", "qualification", "properties", "site-visits",
+                    "negotiations", "bookings", "documents", "payments")
                     .contains(resource);
         }
         return false;
+    }
+
+    /**
+     * Mutation rules are kept server-side so a hidden sidebar item is never
+     * the only protection for a restricted operation.
+     */
+    public static boolean canMutate(String role, String method, String resource) {
+        if (ADMIN_OWNER.equals(role)) {
+            return true;
+        }
+        if (EMPLOYEE.equals(role)) {
+            return Set.of("enquiries", "followups", "qualification", "site-visits",
+                    "negotiations", "bookings", "documents", "loans", "agreements",
+                    "payments", "possession", "support").contains(resource);
+        }
+        if (AGENT.equals(role)) {
+            if ("documents".equals(resource)) {
+                return "POST".equals(method);
+            }
+            if ("payments".equals(resource) || "properties".equals(resource)) {
+                return false;
+            }
+            return "POST".equals(method) || "PUT".equals(method);
+        }
+        return false;
+    }
+
+    public static boolean canDelete(String role, String resource) {
+        return ADMIN_OWNER.equals(role) || (EMPLOYEE.equals(role)
+                && Set.of("enquiries", "followups", "qualification", "site-visits", "negotiations",
+                "bookings", "documents", "loans", "agreements", "payments", "possession", "support")
+                .contains(resource));
+    }
+
+    public static boolean canApprove(String role) {
+        return ADMIN_OWNER.equals(role);
     }
 }

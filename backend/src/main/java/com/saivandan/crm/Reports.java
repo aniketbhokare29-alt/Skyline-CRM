@@ -75,40 +75,79 @@ public class Reports {
     public static List<NavSection> navSections(String role) {
         role = RolePolicy.normalize(role);
         if (RolePolicy.ADMIN_OWNER.equals(role)) {
-            return List.of(new NavSection("CRM", List.of(
+            return List.of(
+                    new NavSection("CRM", List.of(
                     new NavItem("/dashboard", "Dashboard"),
                     new NavItem("/enquiries", "All Enquiries"),
-                    new NavItem("/followups", "Follow-ups"),
                     new NavItem("/qualification", "Leads"),
+                    new NavItem("/followups", "Follow-ups"),
+                    new NavItem("/properties", "Properties"),
+                    new NavItem("/site-visits", "Site Visits"),
+                    new NavItem("/negotiations", "Negotiations"),
                     new NavItem("/bookings", "Bookings"),
-                    new NavItem("/payments", "Sales"),
-                    new NavItem("/vendor-payments", "Vendor Payments"),
-                    new NavItem("/petty-cash", "Petty Cash"),
-                    new NavItem("/create-employee", "Create Employee"),
-                    new NavItem("/create-agent", "Create Agent"),
-                    new NavItem("/finance-dashboard", "Finance Dashboard")
-            )));
+                    new NavItem("/documents", "Documents"),
+                    new NavItem("/loans", "Loan Processing"),
+                    new NavItem("/agreements", "Agreements"),
+                    new NavItem("/payments", "Payment Tracking"),
+                    new NavItem("/possession", "Possession"),
+                    new NavItem("/support", "Customer Support")
+                    )),
+                    new NavSection("Sales", List.of(new NavItem("/payments", "Sales"))),
+                    new NavSection("HR & Payroll", List.of(
+                            new NavItem("/employees", "Employees"),
+                            new NavItem("/attendance", "Attendance"),
+                            new NavItem("/leaves", "Leave"),
+                            new NavItem("/salary", "Payroll")
+                    )),
+                    new NavSection("Vendors", List.of(
+                            new NavItem("/vendors", "Vendors"),
+                            new NavItem("/purchase-orders", "Purchase Orders"),
+                            new NavItem("/vendor-payments", "Vendor Payments")
+                    )),
+                    new NavSection("Finance", List.of(
+                            new NavItem("/petty-cash", "Petty Cash"),
+                            new NavItem("/finance-dashboard", "Finance Dashboard")
+                    )),
+                    new NavSection("Administration", List.of(
+                            new NavItem("/register", "Create User"),
+                            new NavItem("/create-employee", "Create Employee"),
+                            new NavItem("/create-agent", "Create Agent")
+                    ))
+            );
         }
         if (RolePolicy.AGENT.equals(role)) {
             return List.of(new NavSection("Agent Workspace", List.of(
                     new NavItem("/dashboard", "Dashboard"),
-                    new NavItem("/enquiries", "Enquiry Entry"),
-                    new NavItem("/followups", "Follow-ups"),
+                    new NavItem("/enquiries", "All Enquiries"),
                     new NavItem("/qualification", "Leads"),
-                    new NavItem("/bookings", "Booking"),
-                    new NavItem("/payments", "Sales")
+                    new NavItem("/followups", "Follow-ups"),
+                    new NavItem("/properties", "Properties"),
+                    new NavItem("/site-visits", "Site Visits"),
+                    new NavItem("/negotiations", "Negotiations"),
+                    new NavItem("/bookings", "Bookings"),
+                    new NavItem("/documents", "Documents"),
+                    new NavItem("/payments", "Payment Status")
             )));
         }
-        return List.of(new NavSection("Employee Workspace", List.of(
-                new NavItem("/dashboard", "Dashboard"),
-                new NavItem("/enquiries", "Enquiry Entry"),
-                new NavItem("/followups", "Follow-ups"),
-                new NavItem("/qualification", "Leads"),
-                new NavItem("/bookings", "Booking"),
-                new NavItem("/payments", "Sales"),
-                new NavItem("/vendor-payments", "Vendor Payment"),
-                new NavItem("/petty-cash", "Petty Cash")
-        )));
+        return List.of(
+                new NavSection("CRM", List.of(
+                        new NavItem("/dashboard", "Dashboard"),
+                        new NavItem("/enquiries", "All Enquiries"),
+                        new NavItem("/qualification", "Leads"),
+                        new NavItem("/followups", "Follow-ups"),
+                        new NavItem("/properties", "Properties"),
+                        new NavItem("/site-visits", "Site Visits"),
+                        new NavItem("/negotiations", "Negotiations"),
+                        new NavItem("/bookings", "Bookings"),
+                        new NavItem("/documents", "Documents"),
+                        new NavItem("/loans", "Loan Processing"),
+                        new NavItem("/agreements", "Agreements"),
+                        new NavItem("/payments", "Payment Tracking"),
+                        new NavItem("/possession", "Possession"),
+                        new NavItem("/support", "Customer Support")
+                )),
+                new NavSection("Sales", List.of(new NavItem("/payments", "Sales")))
+        );
     }
 
     // -----------------------------------------------------------------
@@ -117,7 +156,8 @@ public class Reports {
 
     public static int availableUnitCount() {
         return (int) App.STORE.getProperties().stream()
-                .filter(p -> "Available".equals(p.availability()))
+                .filter(p -> "AVAILABLE".equalsIgnoreCase(p.availability())
+                        || "AVAILABLE".equalsIgnoreCase(p.availability().replace(" ", "_")))
                 .count();
     }
 
@@ -153,27 +193,38 @@ public class Reports {
         role = RolePolicy.normalize(role);
         return switch (role) {
             case RolePolicy.AGENT -> List.of(
-                    metric("Total Enquiries", App.STORE.getEnquiries().size()),
-                    metric("Qualified Leads", qualifiedLeadCount()),
-                    metric("Follow-ups", App.STORE.getFollowUps().size()),
-                    metric("Bookings", App.STORE.getBookings().size()),
-                    metric("Sales", App.STORE.getCustomerPayments().size()));
+                    metric("My Enquiries", App.STORE.getEnquiries().size()),
+                    metric("My Leads", qualifiedLeadCount()),
+                    metric("Today's Follow-ups", App.STORE.getFollowUps().size()),
+                    metric("Site Visits", App.STORE.getSiteVisits().size()),
+                    metric("Active Negotiations", App.STORE.getNegotiations().size()),
+                    metric("My Bookings", App.STORE.getBookings().size()),
+                    metric("Available Properties", available));
             case RolePolicy.EMPLOYEE -> List.of(
-                    metric("Total Enquiries", App.STORE.getEnquiries().size()),
-                    metric("Qualified Leads", qualifiedLeadCount()),
-                    metric("Follow-ups", App.STORE.getFollowUps().size()),
+                    metric("My Enquiries", App.STORE.getEnquiries().size()),
+                    metric("My Leads", qualifiedLeadCount()),
+                    metric("Follow-ups Today", App.STORE.getFollowUps().size()),
+                    metric("Site Visits", App.STORE.getSiteVisits().size()),
+                    metric("Active Negotiations", App.STORE.getNegotiations().size()),
                     metric("Bookings", App.STORE.getBookings().size()),
-                    metric("Sales", App.STORE.getCustomerPayments().size()),
-                    metric("Vendor Payments", App.STORE.getVendorPayments().size()),
-                    metric("Petty Cash", App.STORE.getPettyCashEntries().size()));
+                    metric("Pending Documents", App.STORE.getDocumentCollections().size()),
+                    metric("Support Requests", App.STORE.getSupportTickets().size()));
             default -> List.of(
                     metric("Total Enquiries", App.STORE.getEnquiries().size()),
                     metric("Qualified Leads", qualifiedLeadCount()),
                     metric("Bookings", App.STORE.getBookings().size()),
                     metric("Sales", App.STORE.getCustomerPayments().size()),
                     metric("Employees", App.STORE.countUsersByRole(RolePolicy.EMPLOYEE)),
-                    metric("Agents", App.STORE.countUsersByRole(RolePolicy.AGENT)));
+                    metric("Agents", App.STORE.countUsersByRole(RolePolicy.AGENT)),
+                    metric("Available Properties", available),
+                    metric("Pending Payments", pendingPaymentCount()));
         };
+    }
+
+    private static int pendingPaymentCount() {
+        return (int) App.STORE.getCustomerPayments().stream()
+                .filter(payment -> parseMoney(payment.pendingAmount()) > 0)
+                .count();
     }
 
     private static int qualifiedLeadCount() {
@@ -249,7 +300,10 @@ public class Reports {
         Map<String, Integer> propertyAvailability = new LinkedHashMap<>();
         for (String label : List.of("Available", "Booked", "Sold", "Other")) propertyAvailability.put(label, 0);
         for (PropertyUnit unit : App.STORE.getProperties()) {
-            String status = unit.availability();
+            String status = unit.availability() == null ? "Other" : unit.availability().toUpperCase(Locale.ROOT);
+            if ("BOOKED".equals(status)) status = "Booked";
+            if ("AVAILABLE".equals(status)) status = "Available";
+            if ("SOLD".equals(status)) status = "Sold";
             increment(propertyAvailability, propertyAvailability.containsKey(status) ? status : "Other");
         }
         Map<String, Integer> bookingStatus = new LinkedHashMap<>();
@@ -303,10 +357,42 @@ public class Reports {
     }
 
     private static Analytics adminAnalytics() {
+        Map<String, Integer> bookingStatus = new LinkedHashMap<>();
+        for (String label : List.of("Pending", "Confirmed", "Cancelled", "Other")) bookingStatus.put(label, 0);
+        for (Booking booking : App.STORE.getBookings()) {
+            String status = booking.status() == null ? "Other" : booking.status();
+            increment(bookingStatus, bookingStatus.containsKey(status) ? status : "Other");
+        }
+        Map<String, Integer> paymentStatus = new LinkedHashMap<>();
+        for (String label : List.of("Pending", "Partially Paid", "Paid", "Overdue")) paymentStatus.put(label, 0);
+        for (CustomerPayment payment : App.STORE.getCustomerPayments()) {
+            int pending = parseMoney(payment.pendingAmount());
+            String status = pending <= 0 ? "Paid" : "Pending";
+            increment(paymentStatus, status);
+        }
+        Map<String, Integer> propertyAvailability = new LinkedHashMap<>();
+        for (String label : List.of("Available", "Reserved", "Sold", "Other")) propertyAvailability.put(label, 0);
+        for (PropertyUnit unit : App.STORE.getProperties()) {
+            String raw = unit.availability() == null ? "" : unit.availability().toUpperCase(Locale.ROOT);
+            String status = raw.contains("SOLD") ? "Sold" : raw.contains("RESERV") || raw.contains("BOOK") ? "Reserved" : raw.contains("AVAILABLE") ? "Available" : "Other";
+            increment(propertyAvailability, status);
+        }
+        Map<String, Integer> sales = new LinkedHashMap<>();
+        sales.put("Bookings", App.STORE.getBookings().size());
+        sales.put("Payments", App.STORE.getCustomerPayments().size());
+        sales.put("Collected", paymentsTotalPaid());
+        Map<String, Integer> vendorOutstanding = new LinkedHashMap<>();
+        vendorOutstanding.put("Bills", vendorBillsOutstanding());
+        vendorOutstanding.put("Vendor Payment Balance", vendorPaymentsTotalBalance());
         return analytics("Admin Analytics",
                 chart("Enquiry Status", groupedEnquiryStatuses()),
                 chart("Lead Source", groupedLeadSources()),
-                chart("User Roles", userRoles()));
+                chart("User Roles", userRoles()),
+                chart("Booking Status", bookingStatus),
+                chart("Payment Status", paymentStatus),
+                chart("Property Availability", propertyAvailability),
+                chart("Sales Summary", sales),
+                chart("Vendor Outstanding", vendorOutstanding));
     }
 
     private static Map<String, Integer> groupedEnquiryStatuses() {

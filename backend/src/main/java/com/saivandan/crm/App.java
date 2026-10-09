@@ -110,6 +110,7 @@ public class App {
         
         byte[] content = Files.readAllBytes(filePath);
         exchange.getResponseHeaders().set("Content-Type", contentType);
+        exchange.getResponseHeaders().set("Content-Disposition", "inline; filename=\"" + filePath.getFileName() + "\"");
         exchange.sendResponseHeaders(200, content.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(content);

@@ -44,7 +44,7 @@ public class Utils {
         
         String[] parts = body.split(Pattern.quote(delimiter));
         for (String part : parts) {
-            if (part.trim().isEmpty() || part.contains("--")) continue;
+            if (part.trim().isEmpty() || part.trim().equals("--")) continue;
             
             int headerEnd = part.indexOf("\r\n\r\n");
             if (headerEnd == -1) continue;

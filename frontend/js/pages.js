@@ -148,7 +148,11 @@ SkylinePages.enquiries = async function () {
   bindEditableRows('enquiries', 'enquiry-form', rows);
 };
 
-SkylinePages.properties = async function () {
+SkylinePages.properties = async function (role) {
+  const form = document.getElementById('property-form');
+  if (role !== 'ADMIN_OWNER' && form) {
+    form.hidden = true;
+  }
   const rows = await loadRows('properties', (p, index) =>
     '<tr>\n' +
     '  <td>' + escape(p.unit) + '</td><td>' + escape(p.wing) + '</td><td>' + escape(p.floor) + '</td>' +
@@ -224,14 +228,16 @@ SkylinePages.bookings = async function () {
 function fileLink(value) {
   if (!value) return '<span class="status status-warn">Not uploaded</span>';
   const filename = value.split('/').pop() || value;
-  return '<a href="' + escape(value) + '" target="_blank" class="button button-small">' + escape(filename) + '</a>';
+  const href = value.startsWith('/uploads/') ? API_BASE.replace(/\/api$/, '') + value : value;
+  return '<a href="' + escape(href) + '" target="_blank" rel="noopener" class="button button-small">View</a> <span class="subtle">' + escape(filename) + '</span>';
 }
 
 SkylinePages.documents = async function () {
   const rows = await loadRows('documents', (d, index) =>
-    '<tr><td>' + escape(d.customer) + '</td><td>' + fileLink(d.panCard) + '</td><td>' + fileLink(d.aadhaarCard) +
-    '</td><td>' + fileLink(d.passportPhoto) + '</td><td>' + fileLink(d.addressProof) + '</td><td>' +
-    fileLink(d.incomeProof) + '</td><td>' + fileLink(d.bankStatement) + '</td>' +
+    '<tr><td>' + escape(d.customerId) + '</td><td>' + escape(d.customer) + '</td><td>' + escape(d.bookingId || '') +
+    '</td><td>' + escape(d.documentType) + '</td><td>' + fileLink(d.filePath) + '</td><td>' + escape(d.originalFileName || '') +
+    '</td><td><span class="status ' + statusClass('documents', d.verificationStatus) + '">' + escape(d.verificationStatus) + '</span></td>' +
+    '<td>' + escape(d.uploadedBy || '') + '</td><td>' + escape(d.uploadedDate || '') + '</td><td>' + escape(d.version) + '</td>' +
     '<td><button type="button" class="button button-small" data-edit-index="' + index + '">Edit</button> ' +
     '<button type="button" class="button button-small button-danger" data-delete-index="' + index + '">Delete</button></td></tr>\n');
   bindEditableRows('documents', 'documents-form', rows);
@@ -257,7 +263,7 @@ SkylinePages.agreements = async function () {
   bindEditableRows('agreements', 'agreement-form', rows);
 };
 
-SkylinePages.payments = async function () {
+SkylinePages.payments = async function (role) {
   const data = await Api.get('/payments');
   renderCards([
     metric('Paid Amount', data.totalPaid),
@@ -270,6 +276,11 @@ SkylinePages.payments = async function () {
     '<button type="button" class="button button-small button-danger" data-delete-index="' + index + '">Delete</button></td></tr>\n'
   ).join('');
   bindEditableRows('payments', 'payment-form', data.items);
+  if (role === 'AGENT') {
+    const form = document.getElementById('payment-form');
+    if (form) form.hidden = true;
+    document.querySelectorAll('#payments-form, [data-endpoint="payments"] .button').forEach(button => button.disabled = true);
+  }
 };
 
 SkylinePages.possession = async function () {
@@ -347,8 +358,30 @@ SkylinePages.salary = async function () {
   ).join('');
 };
 
-function printSalarySlip(id) {
-  window.open('/api/salary/' + encodeURIComponent(id) + '/slip', '_blank');
+async function printSalarySlip(id) {
+  const popup = window.open('about:blank', '_blank');
+  if (!popup) {
+    alert('Please allow pop-ups to print the salary slip.');
+    return;
+  }
+  popup.document.write('<p style="font-family:Arial;padding:24px">Loading salary slip...</p>');
+  try {
+    const response = await fetch(API_BASE + '/salary/' + encodeURIComponent(id) + '/slip', {
+      method: 'GET',
+      headers: Api.headers()
+    });
+    const html = await response.text();
+    if (!response.ok) {
+      throw new Error(html || 'Unable to load salary slip.');
+    }
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+  } catch (err) {
+    popup.close();
+    alert(err.message || 'Unable to load salary slip.');
+  }
 }
 
 /* ------------------------------------------------------------------ */

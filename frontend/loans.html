@@ -13,12 +13,16 @@
       <input type="hidden" name="id">
       <div class="form-grid">
         <label>Customer Name<input name="customer" required></label>
+        <label>Booking ID<input name="bookingId"></label>
         <label>Bank Name<input name="bankName"></label>
         <label>Loan Amount<input name="loanAmount"></label>
         <label>EMI<input name="emi"></label>
         <label>Sanction Date<input name="sanctionDate" type="date"></label>
-        <label>Status<select name="status"><option>Loan Applied</option><option>Bank Verification</option><option>Approved</option><option>Rejected</option><option>Disbursed</option></select></label>
+        <label>Application Date<input name="applicationDate" type="date" data-default="today"></label>
+        <label>Verification Date<input name="verificationDate" type="date"></label>
+        <label>Status<select name="status"><option>NOT_APPLIED</option><option>LOAN_APPLIED</option><option>BANK_VERIFICATION</option><option>APPROVED</option><option>REJECTED</option><option>DISBURSED</option></select></label>
       </div>
+      <label>Remarks<textarea name="remarks"></textarea></label>
       <button class="button" type="submit">Save Loan</button>
     </form>
     <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>Bank</th><th>Loan Amount</th><th>EMI</th><th>Sanction Date</th><th>Status</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>

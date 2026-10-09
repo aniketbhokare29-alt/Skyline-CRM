@@ -78,7 +78,7 @@ if ($apiAlreadyRunning) {
     try {
         $health = Invoke-RestMethod -Uri "http://localhost:8080/api/health" -TimeoutSec 2
         $apiIsCurrent = $health.service -eq "skyline-crm-api" `
-            -and $health.version -eq "6" `
+        -and $health.version -eq "13" `
             -and [string]$health.db -like "jdbc:mysql:*"
     } catch {
         $apiIsCurrent = $false

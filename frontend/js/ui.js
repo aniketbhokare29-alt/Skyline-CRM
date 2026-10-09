@@ -240,6 +240,9 @@ function bindEditableRows(endpoint, formId, rows) {
         if (key === 'id') return;
         const field = form.elements.namedItem(key);
         if (!field) return;
+        // Browsers do not allow JavaScript to populate a file input with a
+        // server path. Existing files remain available through their View link.
+        if (field.type === 'file') return;
         field.value = row[key] == null ? '' : row[key];
       });
       const submit = form.querySelector('button[type="submit"]');

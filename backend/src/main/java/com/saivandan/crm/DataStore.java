@@ -159,6 +159,7 @@ public class DataStore {
             stmt.execute("CREATE TABLE IF NOT EXISTS negotiations (customer VARCHAR(255), unit VARCHAR(255), offeredPrice VARCHAR(255), discount VARCHAR(255), managementApproval VARCHAR(255), specialOffer VARCHAR(255))");
             stmt.execute("CREATE TABLE IF NOT EXISTS bookings (id " + pk + ", customer VARCHAR(255), bookingAmount VARCHAR(255), bookingDate VARCHAR(255), unit VARCHAR(255), floor VARCHAR(255), flatType VARCHAR(255), status VARCHAR(255))");
             stmt.execute("CREATE TABLE IF NOT EXISTS documentcollections (customer VARCHAR(255), panCard VARCHAR(255), aadhaarCard VARCHAR(255), passportPhoto VARCHAR(255), addressProof VARCHAR(255), incomeProof VARCHAR(255), bankStatement VARCHAR(255))");
+            stmt.execute("CREATE TABLE IF NOT EXISTS documents (id " + pk + ", customerId VARCHAR(191) NOT NULL, customer VARCHAR(255), bookingId VARCHAR(191), documentType VARCHAR(64) NOT NULL, originalFileName VARCHAR(255), storedFileName VARCHAR(255), filePath VARCHAR(500) NOT NULL, fileType VARCHAR(191), fileSize BIGINT NOT NULL DEFAULT 0, verificationStatus VARCHAR(32) NOT NULL DEFAULT 'PENDING', uploadedBy VARCHAR(191), uploadedDate VARCHAR(100), version INT NOT NULL DEFAULT 1)");
             stmt.execute("CREATE TABLE IF NOT EXISTS loans (customer VARCHAR(255), bankName VARCHAR(255), loanAmount VARCHAR(255), emi VARCHAR(255), sanctionDate VARCHAR(255), status VARCHAR(255))");
             stmt.execute("CREATE TABLE IF NOT EXISTS agreements (customer VARCHAR(255), unit VARCHAR(255), agreementDate VARCHAR(255), stampDuty VARCHAR(255), registrationDate VARCHAR(255), registrationNumber VARCHAR(255))");
             stmt.execute("CREATE TABLE IF NOT EXISTS customerpayments (id " + pk + ", customer VARCHAR(255), installmentType VARCHAR(255), totalCost VARCHAR(255), paidAmount VARCHAR(255), pendingAmount VARCHAR(255), dueDate VARCHAR(255), history VARCHAR(255))");
@@ -229,16 +230,10 @@ public class DataStore {
                     }
                 }
             }
+            applyFeatureMigrations(stmt);
+            migrateLegacyDocuments(conn);
             normalizeRegisteredUserRoles(stmt);
-            try {
-                stmt.execute("ALTER TABLE registeredusers ADD CONSTRAINT chk_registeredusers_role CHECK (role IN ('ADMIN_OWNER', 'EMPLOYEE', 'AGENT'))");
-            } catch (SQLException constraintError) {
-                // The constraint may already exist, or the server may not enforce CHECK constraints.
-                if (!isAlreadyApplied(constraintError)) {
-                    System.err.println("Could not validate registered user roles.");
-                    constraintError.printStackTrace(System.err);
-                }
-            }
+            ensureRegisteredUserRoleConstraint(conn, stmt);
             ensureBootstrapUsers(conn);
             syncEmployeeRecords(conn);
             syncAgentRecords(conn);
@@ -278,16 +273,169 @@ public class DataStore {
         String message = error.getMessage() == null ? "" : error.getMessage().toLowerCase();
         return message.contains("duplicate column")
                 || message.contains("duplicate key name")
+                || message.contains("duplicate check constraint name")
                 || message.contains("already exists")
                 || message.contains("check that column/key exists")
                 || message.contains("duplicate constraint")
                 || message.contains("multiple primary key");
     }
 
+    /**
+     * Adds the role check only when it is absent. MySQL reports an existing
+     * check constraint as a duplicate constraint-name error, which should be
+     * a normal startup state rather than an error log entry.
+     */
+    private void ensureRegisteredUserRoleConstraint(Connection conn, Statement stmt) throws SQLException {
+        if (IS_SQLITE) {
+            return;
+        }
+        String sql = "SELECT COUNT(*) FROM information_schema.table_constraints "
+                + "WHERE constraint_schema = DATABASE() "
+                + "AND table_name = 'registeredusers' "
+                + "AND constraint_name = 'chk_registeredusers_role'";
+        try (Statement check = conn.createStatement(); ResultSet rs = check.executeQuery(sql)) {
+            if (rs.next() && rs.getInt(1) > 0) {
+                return;
+            }
+        }
+        try {
+            stmt.execute("ALTER TABLE registeredusers ADD CONSTRAINT chk_registeredusers_role CHECK (role IN ('ADMIN_OWNER', 'EMPLOYEE', 'AGENT'))");
+        } catch (SQLException constraintError) {
+            // Another startup process may have created it between the check
+            // and ALTER statements. Ignore only that expected race.
+            if (!isAlreadyApplied(constraintError)) {
+                throw constraintError;
+            }
+        }
+    }
+
     private void normalizeRegisteredUserRoles(Statement stmt) throws SQLException {
         stmt.executeUpdate("UPDATE registeredusers SET role = 'ADMIN_OWNER' WHERE role IN ('Admin', 'Admin Owner', 'admin_owner')");
         stmt.executeUpdate("UPDATE registeredusers SET role = 'AGENT' WHERE lower(role) = 'agent'");
         stmt.executeUpdate("UPDATE registeredusers SET role = 'EMPLOYEE' WHERE role IS NULL OR trim(role) = '' OR role NOT IN ('ADMIN_OWNER', 'EMPLOYEE', 'AGENT')");
+    }
+
+    /**
+     * MySQL versions used by local installations do not consistently support
+     * ALTER TABLE ... ADD COLUMN IF NOT EXISTS. Check information_schema first
+     * so upgrades work on both fresh and previously-created databases.
+     */
+    private void ensureMysqlColumn(Statement stmt, String table, String column, String definition) throws SQLException {
+        String checkSql = "SELECT COUNT(*) FROM information_schema.columns "
+                + "WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?";
+        try (PreparedStatement check = stmt.getConnection().prepareStatement(checkSql)) {
+            check.setString(1, table);
+            check.setString(2, column);
+            try (ResultSet rs = check.executeQuery()) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    stmt.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+                }
+            }
+        }
+    }
+
+    /** Additive schema upgrades for the complete CRM workflow. */
+    private void applyFeatureMigrations(Statement stmt) throws SQLException {
+        if (IS_SQLITE) {
+            return;
+        }
+        List<String> migrations = List.of(
+                "ALTER TABLE properties ADD COLUMN IF NOT EXISTS projectName VARCHAR(191)",
+                "ALTER TABLE properties ADD COLUMN IF NOT EXISTS builtUpArea VARCHAR(100)",
+                "ALTER TABLE properties ADD COLUMN IF NOT EXISTS createdBy VARCHAR(191)",
+                "ALTER TABLE properties ADD COLUMN IF NOT EXISTS updatedBy VARCHAR(191)",
+                "ALTER TABLE properties ADD COLUMN IF NOT EXISTS createdAt TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP",
+                "ALTER TABLE properties ADD COLUMN IF NOT EXISTS updatedAt TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+                "ALTER TABLE sitevisits ADD COLUMN IF NOT EXISTS bookingId VARCHAR(191)",
+                "ALTER TABLE sitevisits ADD COLUMN IF NOT EXISTS remarks VARCHAR(255)",
+                "ALTER TABLE sitevisits ADD COLUMN IF NOT EXISTS createdBy VARCHAR(191)",
+                "ALTER TABLE sitevisits ADD COLUMN IF NOT EXISTS createdAt TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP",
+                "ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS originalPrice VARCHAR(255)",
+                "ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS remarks VARCHAR(255)",
+                "ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS negotiationDate VARCHAR(100)",
+                "ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS createdBy VARCHAR(191)",
+                "ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS approvalStatus VARCHAR(32) DEFAULT 'PENDING'",
+                "ALTER TABLE documentcollections ADD COLUMN IF NOT EXISTS bookingId VARCHAR(191)",
+                "ALTER TABLE documentcollections ADD COLUMN IF NOT EXISTS documentType VARCHAR(100)",
+                "ALTER TABLE documentcollections ADD COLUMN IF NOT EXISTS uploadDate VARCHAR(100)",
+                "ALTER TABLE documentcollections ADD COLUMN IF NOT EXISTS uploadedBy VARCHAR(191)",
+                "ALTER TABLE documentcollections ADD COLUMN IF NOT EXISTS verificationStatus VARCHAR(32) DEFAULT 'PENDING'",
+                "ALTER TABLE documentcollections ADD COLUMN IF NOT EXISTS remarks VARCHAR(255)",
+                "ALTER TABLE loans ADD COLUMN IF NOT EXISTS bookingId VARCHAR(191)",
+                "ALTER TABLE loans ADD COLUMN IF NOT EXISTS applicationDate VARCHAR(100)",
+                "ALTER TABLE loans ADD COLUMN IF NOT EXISTS verificationDate VARCHAR(100)",
+                "ALTER TABLE loans ADD COLUMN IF NOT EXISTS remarks VARCHAR(255)",
+                "ALTER TABLE loans ADD COLUMN IF NOT EXISTS createdBy VARCHAR(191)",
+                "ALTER TABLE agreements ADD COLUMN IF NOT EXISTS bookingId VARCHAR(191)",
+                "ALTER TABLE agreements ADD COLUMN IF NOT EXISTS agreementStatus VARCHAR(32) DEFAULT 'PENDING'",
+                "ALTER TABLE agreements ADD COLUMN IF NOT EXISTS remarks VARCHAR(255)",
+                "ALTER TABLE agreements ADD COLUMN IF NOT EXISTS createdBy VARCHAR(191)",
+                "ALTER TABLE customerpayments ADD COLUMN IF NOT EXISTS bookingId VARCHAR(191)",
+                "ALTER TABLE customerpayments ADD COLUMN IF NOT EXISTS unit VARCHAR(191)",
+                "ALTER TABLE customerpayments ADD COLUMN IF NOT EXISTS paymentType VARCHAR(50)",
+                "ALTER TABLE customerpayments ADD COLUMN IF NOT EXISTS paymentDate VARCHAR(100)",
+                "ALTER TABLE customerpayments ADD COLUMN IF NOT EXISTS paymentMode VARCHAR(100)",
+                "ALTER TABLE customerpayments ADD COLUMN IF NOT EXISTS transactionReference VARCHAR(191)",
+                "ALTER TABLE customerpayments ADD COLUMN IF NOT EXISTS remarks VARCHAR(255)",
+                "ALTER TABLE customerpayments ADD COLUMN IF NOT EXISTS paymentStatus VARCHAR(32) DEFAULT 'PENDING'",
+                "ALTER TABLE customerpayments ADD COLUMN IF NOT EXISTS createdAt TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP",
+                "ALTER TABLE possessions ADD COLUMN IF NOT EXISTS bookingId VARCHAR(191)",
+                "ALTER TABLE possessions ADD COLUMN IF NOT EXISTS possessionDate VARCHAR(100)",
+                "ALTER TABLE possessions ADD COLUMN IF NOT EXISTS overallStatus VARCHAR(32) DEFAULT 'READY'",
+                "ALTER TABLE possessions ADD COLUMN IF NOT EXISTS createdBy VARCHAR(191)",
+                "ALTER TABLE possessions ADD COLUMN IF NOT EXISTS updatedAt TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+                "ALTER TABLE supporttickets ADD COLUMN IF NOT EXISTS bookingId VARCHAR(191)",
+                "ALTER TABLE supporttickets ADD COLUMN IF NOT EXISTS ticketNumber VARCHAR(191)",
+                "ALTER TABLE supporttickets ADD COLUMN IF NOT EXISTS type VARCHAR(50)",
+                "ALTER TABLE supporttickets ADD COLUMN IF NOT EXISTS subject VARCHAR(255)",
+                "ALTER TABLE supporttickets ADD COLUMN IF NOT EXISTS createdDate VARCHAR(100)",
+                "ALTER TABLE supporttickets ADD COLUMN IF NOT EXISTS dueDate VARCHAR(100)",
+                "ALTER TABLE supporttickets ADD COLUMN IF NOT EXISTS resolution VARCHAR(255)",
+                "ALTER TABLE supporttickets ADD COLUMN IF NOT EXISTS closedDate VARCHAR(100)",
+                "ALTER TABLE supporttickets ADD COLUMN IF NOT EXISTS createdBy VARCHAR(191)",
+                "ALTER TABLE supporttickets ADD COLUMN IF NOT EXISTS updatedBy VARCHAR(191)",
+                "ALTER TABLE employees ADD COLUMN IF NOT EXISTS panNumber VARCHAR(100)",
+                "ALTER TABLE employees ADD COLUMN IF NOT EXISTS aadhaarNumber VARCHAR(100)",
+                "ALTER TABLE employees ADD COLUMN IF NOT EXISTS pfEsicDetails VARCHAR(255)",
+                "ALTER TABLE salarypayments ADD COLUMN IF NOT EXISTS commission VARCHAR(255)",
+                "ALTER TABLE salarypayments ADD COLUMN IF NOT EXISTS pf VARCHAR(255)",
+                "ALTER TABLE salarypayments ADD COLUMN IF NOT EXISTS esic VARCHAR(255)",
+                "ALTER TABLE salarypayments ADD COLUMN IF NOT EXISTS professionalTax VARCHAR(255)",
+                "ALTER TABLE salarypayments ADD COLUMN IF NOT EXISTS advanceSalary VARCHAR(255)",
+                "ALTER TABLE salarypayments ADD COLUMN IF NOT EXISTS loanRecovery VARCHAR(255)",
+                "ALTER TABLE salarypayments ADD COLUMN IF NOT EXISTS salarySlipPath VARCHAR(255)"
+        );
+        for (String migration : migrations) {
+            try {
+                Matcher matcher = Pattern.compile(
+                        "ALTER TABLE ([A-Za-z0-9_]+) ADD COLUMN IF NOT EXISTS ([A-Za-z0-9_]+) (.+)",
+                        Pattern.CASE_INSENSITIVE).matcher(migration);
+                if (matcher.matches()) {
+                    ensureMysqlColumn(stmt, matcher.group(1), matcher.group(2), matcher.group(3));
+                } else {
+                    stmt.execute(migration);
+                }
+            } catch (SQLException error) {
+                if (!isAlreadyApplied(error)) {
+                    System.err.println("Feature migration skipped: " + migration);
+                    error.printStackTrace(System.err);
+                }
+            }
+        }
+        for (String index : List.of(
+                "CREATE INDEX idx_sitevisits_status ON sitevisits(status)",
+                "CREATE INDEX idx_negotiations_approval ON negotiations(approvalStatus)",
+                "CREATE INDEX idx_documents_verification ON documentcollections(verificationStatus)",
+                "CREATE INDEX idx_payments_status ON customerpayments(paymentStatus)",
+                "CREATE INDEX idx_support_status ON supporttickets(status)")) {
+            try {
+                stmt.execute(index);
+            } catch (SQLException error) {
+                if (!isAlreadyApplied(error)) {
+                    System.err.println("Feature index skipped: " + index);
+                }
+            }
+        }
     }
 
     private void ensureBootstrapUsers(Connection conn) throws SQLException {
@@ -489,6 +637,8 @@ public class DataStore {
             if (tableCount(conn, "salarypayments") == 0) {
                 insertSalaryPayment(conn, new SalaryPayment("EMP-001", "Sneha Kulkarni", "September 2026", "25000", "10000", "8000", "0", "3000", "43000", "40000", LocalDate.now().toString(), "Bank Transfer", "Pending"));
             }
+            ensureIndianPayrollRecords(conn);
+            ensureDemoDocuments(conn);
             if (tableCount(conn, "vendors") == 0) {
                 insertVendor(conn, new Vendor("Mohan Electricals", "Mohan Electricals Pvt Ltd", "27AAECM1234K1Z5", "AAECM1234K", "Mohan Patil", "9876500101", "billing@mohanelectricals.local", "Pune", "HDFC 9988", "Electrical Contractor"));
             }
@@ -516,6 +666,76 @@ public class DataStore {
         try (Statement s = conn.createStatement();
              ResultSet rs = s.executeQuery("SELECT count(*) FROM `" + table + "`")) {
             return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
+
+    /** Adds the demo Indian payroll rows without duplicating an existing month. */
+    private void ensureIndianPayrollRecords(Connection conn) throws SQLException {
+        List<SalaryPayment> records = List.of(
+                new SalaryPayment("EMP-SAM-001", "Amit Sharma", "October 2026", "30000", "7000", "4500", "1500", "2500", "43000", "40500", "2026-10-31", "UPI", "Paid"),
+                new SalaryPayment("EMP-SAM-002", "Priya Kulkarni", "October 2026", "31000", "7000", "3500", "1000", "2500", "42500", "40000", "2026-10-31", "Bank Transfer", "Paid"),
+                new SalaryPayment("EMP-SAM-003", "Neha Joshi", "October 2026", "35000", "7000", "0", "2000", "3000", "44000", "41000", "2026-10-31", "Bank Transfer", "Paid"),
+                new SalaryPayment("EMP-SAM-004", "Kunal Deshpande", "October 2026", "40000", "7000", "0", "2500", "3500", "49500", "46000", "2026-10-31", "Bank Transfer", "Pending"),
+                new SalaryPayment("EMP-SAM-005", "Riya Patil", "October 2026", "28000", "6000", "2500", "1000", "2200", "37500", "35300", "2026-10-31", "UPI", "Paid"),
+                new SalaryPayment("EMP-SAM-006", "Nikhil Pawar", "October 2026", "30000", "6000", "0", "1000", "2200", "37000", "34800", "2026-10-31", "Bank Transfer", "Pending"));
+        String existsSql = "SELECT COUNT(*) FROM salarypayments WHERE employeeId = ? AND salaryMonth = ?";
+        try (PreparedStatement exists = conn.prepareStatement(existsSql)) {
+            for (SalaryPayment record : records) {
+                exists.setString(1, record.employeeId());
+                exists.setString(2, record.salaryMonth());
+                try (ResultSet rs = exists.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 0) continue;
+                }
+                insertSalaryPayment(conn, record);
+            }
+        }
+    }
+
+    /** Creates viewable sample files and metadata for the Document Collection page. */
+    private void ensureDemoDocuments(Connection conn) throws SQLException {
+        String customerId = "CUST-DEMO-001";
+        String customer = "Amit Sharma";
+        String bookingId = "BOOK-DEMO-001";
+        String uploadedBy = "admin@skyline.local";
+        String html = "<!doctype html><html><head><meta charset=\"utf-8\"><title>Skyline CRM Sample Document</title></head>"
+                + "<body style=\"font-family:Arial;padding:40px\"><h1>Skyline CRM</h1>"
+                + "<h2>Sample Customer Document</h2><p>This is a demo document for testing the View button.</p>"
+                + "<p>Customer: " + customer + " (" + customerId + ")</p></body></html>";
+        for (Map.Entry<String, String> entry : DOCUMENT_FIELDS.entrySet()) {
+            String category = entry.getValue();
+            String storedName = "sample_" + category.toLowerCase() + ".html";
+            Path directory = Paths.get("uploads", "customers", customerId, category).toAbsolutePath().normalize();
+            Path file = directory.resolve(storedName);
+            try {
+                Files.createDirectories(directory);
+                if (!Files.exists(file)) Files.writeString(file, html, StandardCharsets.UTF_8);
+            } catch (IOException error) {
+                throw new SQLException("Unable to create demo document file: " + file, error);
+            }
+            String filePath = "/uploads/customers/" + customerId + "/" + category + "/" + storedName;
+            try (PreparedStatement exists = conn.prepareStatement("SELECT 1 FROM documents WHERE filePath = ?")) {
+                exists.setString(1, filePath);
+                try (ResultSet rs = exists.executeQuery()) {
+                    if (rs.next()) continue;
+                }
+            }
+            Map<String, String> form = new LinkedHashMap<>();
+            form.put("customerId", customerId);
+            form.put("customer", customer);
+            form.put("bookingId", bookingId);
+            form.put("verificationStatus", category.equals("PAN_CARD") ? "VERIFIED" : "PENDING");
+            form.put("uploadedBy", uploadedBy);
+            form.put("uploadDate", LocalDate.now().toString());
+            form.put(entry.getKey(), filePath);
+            form.put(entry.getKey() + ".originalFileName", storedName);
+            form.put(entry.getKey() + ".storedFileName", storedName);
+            form.put(entry.getKey() + ".fileType", "text/html");
+            try {
+                form.put(entry.getKey() + ".fileSize", String.valueOf(Files.size(file)));
+            } catch (IOException error) {
+                throw new SQLException("Unable to read demo document size: " + file, error);
+            }
+            insertDocumentRecord(conn, form, category, filePath, entry.getKey());
         }
     }
 
@@ -749,9 +969,9 @@ public class DataStore {
         }
     }
 
-    private void insertSalaryPayment(Connection conn, SalaryPayment obj) throws SQLException {
+    private long insertSalaryPayment(Connection conn, SalaryPayment obj) throws SQLException {
         String sql = "INSERT INTO salarypayments (employeeId, employeeName, salaryMonth, basicSalary, hra, incentives, bonus, deductions, grossSalary, netSalary, paymentDate, paymentMode, paymentStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setString(1, obj.employeeId());
             pstmt.setString(2, obj.employeeName());
             pstmt.setString(3, obj.salaryMonth());
@@ -766,7 +986,11 @@ public class DataStore {
             pstmt.setString(12, obj.paymentMode());
             pstmt.setString(13, obj.paymentStatus());
             pstmt.executeUpdate();
+            try (ResultSet keys = pstmt.getGeneratedKeys()) {
+                if (keys.next()) return keys.getLong(1);
+            }
         }
+        throw new SQLException("The salary record was saved but its database ID was not returned.");
     }
 
     private void insertRegisteredUser(Connection conn, RegisteredUser obj) throws SQLException {
@@ -893,19 +1117,23 @@ public class DataStore {
     }
 
     public void addProperty(Map<String, String> form) {
-        PropertyUnit obj = new PropertyUnit(
-                form.getOrDefault("unit", ""),
-                form.getOrDefault("wing", ""),
-                form.getOrDefault("floor", ""),
-                form.getOrDefault("flatType", ""),
-                form.getOrDefault("area", ""),
-                form.getOrDefault("price", ""),
-                form.getOrDefault("parking", ""),
-                form.getOrDefault("availability", "Available"),
-                form.getOrDefault("amenities", "")
-        );
         try (Connection conn = openConnection()) {
-            insertPropertyUnit(conn, obj);
+            String sql = "INSERT INTO properties (unit, wing, floor, flatType, area, price, parking, availability, amenities, projectName, builtUpArea, createdBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, form.getOrDefault("unit", ""));
+                ps.setString(2, form.getOrDefault("wing", ""));
+                ps.setString(3, form.getOrDefault("floor", ""));
+                ps.setString(4, form.getOrDefault("flatType", ""));
+                ps.setString(5, form.getOrDefault("area", ""));
+                ps.setString(6, form.getOrDefault("price", ""));
+                ps.setString(7, form.getOrDefault("parking", ""));
+                ps.setString(8, form.getOrDefault("availability", "AVAILABLE"));
+                ps.setString(9, form.getOrDefault("amenities", ""));
+                ps.setString(10, form.getOrDefault("projectName", ""));
+                ps.setString(11, form.getOrDefault("builtUpArea", ""));
+                ps.setString(12, form.getOrDefault("createdBy", ""));
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
@@ -1014,7 +1242,7 @@ public class DataStore {
     }
 
     public void updateSiteVisit(long id, Map<String, String> form) {
-        String sql = "UPDATE sitevisits SET customer = ?, visitDate = ?, visitTime = ?, pickupRequired = ?, executive = ?, status = ?, feedback = ? WHERE id = ?";
+        String sql = "UPDATE sitevisits SET customer = ?, visitDate = ?, visitTime = ?, pickupRequired = ?, executive = ?, status = ?, feedback = ?, bookingId = ?, remarks = ?, createdBy = ? WHERE id = ?";
         try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, form.getOrDefault("customer", ""));
             ps.setString(2, form.getOrDefault("visitDate", ""));
@@ -1023,7 +1251,10 @@ public class DataStore {
             ps.setString(5, form.getOrDefault("executive", ""));
             ps.setString(6, form.getOrDefault("status", "Scheduled"));
             ps.setString(7, form.getOrDefault("feedback", ""));
-            ps.setLong(8, id);
+            ps.setString(8, form.getOrDefault("bookingId", ""));
+            ps.setString(9, form.getOrDefault("remarks", ""));
+            ps.setString(10, form.getOrDefault("createdBy", ""));
+            ps.setLong(11, id);
             requireUpdated(ps.executeUpdate(), "Site visit not found.");
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
@@ -1035,7 +1266,7 @@ public class DataStore {
     }
 
     public void updateProperty(long id, Map<String, String> form) {
-        String sql = "UPDATE properties SET unit = ?, wing = ?, floor = ?, flatType = ?, area = ?, price = ?, parking = ?, availability = ?, amenities = ? WHERE id = ?";
+        String sql = "UPDATE properties SET unit = ?, wing = ?, floor = ?, flatType = ?, area = ?, price = ?, parking = ?, availability = ?, amenities = ?, projectName = ?, builtUpArea = ?, updatedBy = ? WHERE id = ?";
         try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, form.getOrDefault("unit", ""));
             ps.setString(2, form.getOrDefault("wing", ""));
@@ -1046,7 +1277,10 @@ public class DataStore {
             ps.setString(7, form.getOrDefault("parking", ""));
             ps.setString(8, form.getOrDefault("availability", "Available"));
             ps.setString(9, form.getOrDefault("amenities", ""));
-            ps.setLong(10, id);
+            ps.setString(10, form.getOrDefault("projectName", ""));
+            ps.setString(11, form.getOrDefault("builtUpArea", ""));
+            ps.setString(12, form.getOrDefault("createdBy", ""));
+            ps.setLong(13, id);
             requireUpdated(ps.executeUpdate(), "Property not found.");
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
@@ -1058,7 +1292,7 @@ public class DataStore {
     }
 
     public void updateNegotiation(long id, Map<String, String> form) {
-        String sql = "UPDATE negotiations SET customer = ?, unit = ?, offeredPrice = ?, discount = ?, managementApproval = ?, specialOffer = ? WHERE id = ?";
+        String sql = "UPDATE negotiations SET customer = ?, unit = ?, offeredPrice = ?, discount = ?, managementApproval = ?, specialOffer = ?, originalPrice = ?, remarks = ?, negotiationDate = ?, createdBy = ?, approvalStatus = ? WHERE id = ?";
         try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, form.getOrDefault("customer", ""));
             ps.setString(2, form.getOrDefault("unit", ""));
@@ -1066,7 +1300,12 @@ public class DataStore {
             ps.setString(4, form.getOrDefault("discount", ""));
             ps.setString(5, form.getOrDefault("managementApproval", "Pending"));
             ps.setString(6, form.getOrDefault("specialOffer", ""));
-            ps.setLong(7, id);
+            ps.setString(7, form.getOrDefault("originalPrice", ""));
+            ps.setString(8, form.getOrDefault("remarks", ""));
+            ps.setString(9, form.getOrDefault("negotiationDate", ""));
+            ps.setString(10, form.getOrDefault("createdBy", ""));
+            ps.setString(11, form.getOrDefault("approvalStatus", form.getOrDefault("managementApproval", "PENDING")));
+            ps.setLong(12, id);
             requireUpdated(ps.executeUpdate(), "Negotiation not found.");
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
@@ -1078,33 +1317,43 @@ public class DataStore {
     }
 
     public void addSiteVisit(Map<String, String> form) {
-        SiteVisit obj = new SiteVisit(
-                form.getOrDefault("customer", ""),
-                form.getOrDefault("visitDate", ""),
-                form.getOrDefault("visitTime", ""),
-                form.getOrDefault("pickupRequired", "No"),
-                form.getOrDefault("executive", ""),
-                form.getOrDefault("status", "Scheduled"),
-                form.getOrDefault("feedback", "")
-        );
         try (Connection conn = openConnection()) {
-            insertSiteVisit(conn, obj);
+            String sql = "INSERT INTO sitevisits (customer, visitDate, visitTime, pickupRequired, executive, status, feedback, bookingId, remarks, createdBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, form.getOrDefault("customer", ""));
+                ps.setString(2, form.getOrDefault("visitDate", ""));
+                ps.setString(3, form.getOrDefault("visitTime", ""));
+                ps.setString(4, form.getOrDefault("pickupRequired", "No"));
+                ps.setString(5, form.getOrDefault("executive", ""));
+                ps.setString(6, form.getOrDefault("status", "Scheduled"));
+                ps.setString(7, form.getOrDefault("feedback", ""));
+                ps.setString(8, form.getOrDefault("bookingId", ""));
+                ps.setString(9, form.getOrDefault("remarks", ""));
+                ps.setString(10, form.getOrDefault("createdBy", ""));
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
     }
 
     public void addNegotiation(Map<String, String> form) {
-        Negotiation obj = new Negotiation(
-                form.getOrDefault("customer", ""),
-                form.getOrDefault("unit", ""),
-                form.getOrDefault("offeredPrice", ""),
-                form.getOrDefault("discount", ""),
-                form.getOrDefault("managementApproval", "Pending"),
-                form.getOrDefault("specialOffer", "")
-        );
         try (Connection conn = openConnection()) {
-            insertNegotiation(conn, obj);
+            String sql = "INSERT INTO negotiations (customer, unit, offeredPrice, discount, managementApproval, specialOffer, originalPrice, remarks, negotiationDate, createdBy, approvalStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, form.getOrDefault("customer", ""));
+                ps.setString(2, form.getOrDefault("unit", ""));
+                ps.setString(3, form.getOrDefault("offeredPrice", ""));
+                ps.setString(4, form.getOrDefault("discount", ""));
+                ps.setString(5, form.getOrDefault("managementApproval", "Pending"));
+                ps.setString(6, form.getOrDefault("specialOffer", ""));
+                ps.setString(7, form.getOrDefault("originalPrice", ""));
+                ps.setString(8, form.getOrDefault("remarks", ""));
+                ps.setString(9, form.getOrDefault("negotiationDate", ""));
+                ps.setString(10, form.getOrDefault("createdBy", ""));
+                ps.setString(11, form.getOrDefault("approvalStatus", "PENDING"));
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
@@ -1148,42 +1397,131 @@ public class DataStore {
         deleteById("bookings", id, "Booking not found.");
     }
 
+    /** Converts real legacy file paths into the new per-file table once. */
+    private void migrateLegacyDocuments(Connection conn) throws SQLException {
+        String sql = "SELECT id, customer, bookingId, documentType, uploadDate, uploadedBy, verificationStatus, panCard, aadhaarCard, passportPhoto, addressProof, incomeProof, bankStatement FROM documentcollections";
+        try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                String customer = rs.getString("customer");
+                String customerId = customer == null || customer.isBlank() ? "LEGACY-" + rs.getLong("id") : customer;
+                Map<String, String> legacy = new HashMap<>();
+                legacy.put("customerId", customerId);
+                legacy.put("customer", customer == null ? "" : customer);
+                legacy.put("bookingId", rs.getString("bookingId"));
+                legacy.put("verificationStatus", rs.getString("verificationStatus"));
+                legacy.put("uploadedBy", rs.getString("uploadedBy"));
+                legacy.put("uploadDate", rs.getString("uploadDate"));
+                for (Map.Entry<String, String> field : DOCUMENT_FIELDS.entrySet()) {
+                    String path = rs.getString(field.getKey());
+                    if (path == null || path.isBlank() || !path.startsWith("/uploads/")) continue;
+                    try (PreparedStatement exists = conn.prepareStatement("SELECT 1 FROM documents WHERE filePath = ?")) {
+                        exists.setString(1, path);
+                        try (ResultSet found = exists.executeQuery()) {
+                            if (found.next()) continue;
+                        }
+                    }
+                    insertDocumentRecord(conn, legacy, field.getValue(), path, field.getKey());
+                }
+            }
+        }
+    }
+
+    private static final Map<String, String> DOCUMENT_FIELDS = Map.of(
+            "panCard", "PAN_CARD",
+            "aadhaarCard", "AADHAAR_CARD",
+            "passportPhoto", "PASSPORT_PHOTO",
+            "addressProof", "ADDRESS_PROOF",
+            "incomeProof", "INCOME_PROOF",
+            "bankStatement", "BANK_STATEMENT");
+
+    /** Stores one metadata row per uploaded file. A replacement becomes a new version. */
     public void addDocumentCollection(Map<String, String> form) {
-        DocumentCollection obj = new DocumentCollection(
-                form.getOrDefault("customer", ""),
-                form.getOrDefault("panCard", ""),
-                form.getOrDefault("aadhaarCard", ""),
-                form.getOrDefault("passportPhoto", ""),
-                form.getOrDefault("addressProof", ""),
-                form.getOrDefault("incomeProof", ""),
-                form.getOrDefault("bankStatement", "")
-        );
         try (Connection conn = openConnection()) {
-            insertDocumentCollection(conn, obj);
+            conn.setAutoCommit(false);
+            boolean inserted = false;
+            for (Map.Entry<String, String> field : DOCUMENT_FIELDS.entrySet()) {
+                String path = form.getOrDefault(field.getKey(), "").trim();
+                if (!path.isBlank() && path.startsWith("/uploads/")) {
+                    insertDocumentRecord(conn, form, field.getValue(), path, field.getKey());
+                    inserted = true;
+                }
+            }
+            if (!inserted) {
+                throw new IllegalArgumentException("Select at least one document to upload.");
+            }
+            conn.commit();
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
     }
 
-    public void updateDocumentCollection(long id, Map<String, String> form) {
-        String sql = "UPDATE documentcollections SET customer = ?, panCard = ?, aadhaarCard = ?, passportPhoto = ?, addressProof = ?, incomeProof = ?, bankStatement = ? WHERE id = ?";
+    private void insertDocumentRecord(Connection conn, Map<String, String> form, String documentType,
+                                      String path, String fieldName) throws SQLException {
+        String customerId = form.getOrDefault("customerId", "").trim();
+        if (customerId.isBlank()) customerId = form.getOrDefault("bookingId", "").trim();
+        if (customerId.isBlank()) customerId = form.getOrDefault("customer", "").trim();
+        String original = form.getOrDefault(fieldName + ".originalFileName", fileName(path));
+        String stored = form.getOrDefault(fieldName + ".storedFileName", fileName(path));
+        String type = form.getOrDefault(fieldName + ".fileType", "application/octet-stream");
+        long size = parseLong(form.getOrDefault(fieldName + ".fileSize", "0"));
+        int version = 1;
+        try (PreparedStatement next = conn.prepareStatement(
+                "SELECT COALESCE(MAX(version), 0) + 1 FROM documents WHERE customerId = ? AND documentType = ?")) {
+            next.setString(1, customerId);
+            next.setString(2, documentType);
+            try (ResultSet rs = next.executeQuery()) {
+                if (rs.next()) version = rs.getInt(1);
+            }
+        }
+        String sql = "INSERT INTO documents (customerId, customer, bookingId, documentType, originalFileName, storedFileName, filePath, fileType, fileSize, verificationStatus, uploadedBy, uploadedDate, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, customerId);
+            ps.setString(2, form.getOrDefault("customer", ""));
+            ps.setString(3, form.getOrDefault("bookingId", ""));
+            ps.setString(4, documentType);
+            ps.setString(5, original);
+            ps.setString(6, stored);
+            ps.setString(7, path);
+            ps.setString(8, type);
+            ps.setLong(9, size);
+            ps.setString(10, form.getOrDefault("verificationStatus", "PENDING"));
+            ps.setString(11, form.getOrDefault("uploadedBy", form.getOrDefault("createdBy", "")));
+            ps.setString(12, form.getOrDefault("uploadDate", LocalDate.now().toString()));
+            ps.setInt(13, version);
+            ps.executeUpdate();
+        }
+    }
+
+    public void updateDocument(long id, Map<String, String> form) {
+        String sql = "UPDATE documents SET customerId = ?, customer = ?, bookingId = ?, documentType = ?, verificationStatus = ?, uploadedBy = ? WHERE id = ?";
         try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, form.getOrDefault("customer", ""));
-            ps.setString(2, form.getOrDefault("panCard", ""));
-            ps.setString(3, form.getOrDefault("aadhaarCard", ""));
-            ps.setString(4, form.getOrDefault("passportPhoto", ""));
-            ps.setString(5, form.getOrDefault("addressProof", ""));
-            ps.setString(6, form.getOrDefault("incomeProof", ""));
-            ps.setString(7, form.getOrDefault("bankStatement", ""));
-            ps.setLong(8, id);
-            requireUpdated(ps.executeUpdate(), "Document collection not found.");
+            ps.setString(1, form.getOrDefault("customerId", form.getOrDefault("bookingId", "")));
+            ps.setString(2, form.getOrDefault("customer", ""));
+            ps.setString(3, form.getOrDefault("bookingId", ""));
+            ps.setString(4, form.getOrDefault("documentType", ""));
+            ps.setString(5, form.getOrDefault("verificationStatus", "PENDING"));
+            ps.setString(6, form.getOrDefault("uploadedBy", form.getOrDefault("createdBy", "")));
+            ps.setLong(7, id);
+            requireUpdated(ps.executeUpdate(), "Document not found.");
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
     }
 
-    public void deleteDocumentCollection(long id) {
-        deleteById("documentcollections", id, "Document collection not found.");
+    public void deleteDocument(long id) {
+        deleteById("documents", id, "Document not found.");
+    }
+
+    private long parseLong(String value) {
+        try { return Math.max(0, Long.parseLong(value)); }
+        catch (NumberFormatException ignored) { return 0; }
+    }
+
+    private String fileName(String path) {
+        int slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        return slash >= 0 ? path.substring(slash + 1) : path;
     }
 
     public void addLoan(Map<String, String> form) {
@@ -1223,23 +1561,28 @@ public class DataStore {
     }
 
     public void addAgreement(Map<String, String> form) {
-        Agreement obj = new Agreement(
-                form.getOrDefault("customer", ""),
-                form.getOrDefault("unit", ""),
-                form.getOrDefault("agreementDate", ""),
-                form.getOrDefault("stampDuty", ""),
-                form.getOrDefault("registrationDate", ""),
-                form.getOrDefault("registrationNumber", "")
-        );
         try (Connection conn = openConnection()) {
-            insertAgreement(conn, obj);
+            String sql = "INSERT INTO agreements (customer, unit, agreementDate, stampDuty, registrationDate, registrationNumber, bookingId, agreementStatus, remarks, createdBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, form.getOrDefault("customer", ""));
+                ps.setString(2, form.getOrDefault("unit", ""));
+                ps.setString(3, form.getOrDefault("agreementDate", ""));
+                ps.setString(4, form.getOrDefault("stampDuty", ""));
+                ps.setString(5, form.getOrDefault("registrationDate", ""));
+                ps.setString(6, form.getOrDefault("registrationNumber", ""));
+                ps.setString(7, form.getOrDefault("bookingId", ""));
+                ps.setString(8, form.getOrDefault("agreementStatus", "PENDING"));
+                ps.setString(9, form.getOrDefault("remarks", ""));
+                ps.setString(10, form.getOrDefault("createdBy", ""));
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
     }
 
     public void updateAgreement(long id, Map<String, String> form) {
-        String sql = "UPDATE agreements SET customer = ?, unit = ?, agreementDate = ?, stampDuty = ?, registrationDate = ?, registrationNumber = ? WHERE id = ?";
+        String sql = "UPDATE agreements SET customer = ?, unit = ?, agreementDate = ?, stampDuty = ?, registrationDate = ?, registrationNumber = ?, bookingId = ?, agreementStatus = ?, remarks = ?, createdBy = ? WHERE id = ?";
         try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, form.getOrDefault("customer", ""));
             ps.setString(2, form.getOrDefault("unit", ""));
@@ -1247,7 +1590,11 @@ public class DataStore {
             ps.setString(4, form.getOrDefault("stampDuty", ""));
             ps.setString(5, form.getOrDefault("registrationDate", ""));
             ps.setString(6, form.getOrDefault("registrationNumber", ""));
-            ps.setLong(7, id);
+            ps.setString(7, form.getOrDefault("bookingId", ""));
+            ps.setString(8, form.getOrDefault("agreementStatus", "PENDING"));
+            ps.setString(9, form.getOrDefault("remarks", ""));
+            ps.setString(10, form.getOrDefault("createdBy", ""));
+            ps.setLong(11, id);
             requireUpdated(ps.executeUpdate(), "Agreement not found.");
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
@@ -1267,17 +1614,26 @@ public class DataStore {
         } else if (paid.isBlank() && !total.isBlank() && !pending.isBlank()) {
             paid = String.valueOf(money(form, "totalCost") - money(form, "pendingAmount"));
         }
-        CustomerPayment obj = new CustomerPayment(
-                form.getOrDefault("customer", ""),
-                form.getOrDefault("installmentType", ""),
-                total,
-                paid,
-                pending,
-                form.getOrDefault("dueDate", ""),
-                form.getOrDefault("history", "")
-        );
         try (Connection conn = openConnection()) {
-            insertCustomerPayment(conn, obj);
+            String sql = "INSERT INTO customerpayments (customer, installmentType, totalCost, paidAmount, pendingAmount, dueDate, history, bookingId, unit, paymentType, paymentDate, paymentMode, transactionReference, remarks, paymentStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, form.getOrDefault("customer", ""));
+                ps.setString(2, form.getOrDefault("installmentType", form.getOrDefault("paymentType", "")));
+                ps.setString(3, total);
+                ps.setString(4, paid);
+                ps.setString(5, pending);
+                ps.setString(6, form.getOrDefault("dueDate", ""));
+                ps.setString(7, form.getOrDefault("history", form.getOrDefault("remarks", "")));
+                ps.setString(8, form.getOrDefault("bookingId", ""));
+                ps.setString(9, form.getOrDefault("unit", ""));
+                ps.setString(10, form.getOrDefault("paymentType", form.getOrDefault("installmentType", "")));
+                ps.setString(11, form.getOrDefault("paymentDate", ""));
+                ps.setString(12, form.getOrDefault("paymentMode", ""));
+                ps.setString(13, form.getOrDefault("transactionReference", ""));
+                ps.setString(14, form.getOrDefault("remarks", form.getOrDefault("history", "")));
+                ps.setString(15, form.getOrDefault("paymentStatus", "PENDING"));
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
@@ -1295,7 +1651,7 @@ public class DataStore {
             paid = String.valueOf(money(form, "totalCost") - money(form, "pendingAmount"));
         }
         
-        String sql = "UPDATE customerpayments SET customer = ?, installmentType = ?, totalCost = ?, paidAmount = ?, pendingAmount = ?, dueDate = ?, history = ? WHERE id = ?";
+        String sql = "UPDATE customerpayments SET customer = ?, installmentType = ?, totalCost = ?, paidAmount = ?, pendingAmount = ?, dueDate = ?, history = ?, bookingId = ?, unit = ?, paymentType = ?, paymentDate = ?, paymentMode = ?, transactionReference = ?, remarks = ?, paymentStatus = ? WHERE id = ?";
         try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, form.getOrDefault("customer", ""));
             ps.setString(2, form.getOrDefault("installmentType", ""));
@@ -1304,7 +1660,15 @@ public class DataStore {
             ps.setString(5, pending);
             ps.setString(6, form.getOrDefault("dueDate", ""));
             ps.setString(7, form.getOrDefault("history", ""));
-            ps.setLong(8, id);
+            ps.setString(8, form.getOrDefault("bookingId", ""));
+            ps.setString(9, form.getOrDefault("unit", ""));
+            ps.setString(10, form.getOrDefault("paymentType", form.getOrDefault("installmentType", "")));
+            ps.setString(11, form.getOrDefault("paymentDate", ""));
+            ps.setString(12, form.getOrDefault("paymentMode", ""));
+            ps.setString(13, form.getOrDefault("transactionReference", ""));
+            ps.setString(14, form.getOrDefault("remarks", form.getOrDefault("history", "")));
+            ps.setString(15, form.getOrDefault("paymentStatus", "PENDING"));
+            ps.setLong(16, id);
             requireUpdated(ps.executeUpdate(), "Sales entry not found.");
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
@@ -1332,25 +1696,30 @@ public class DataStore {
     }
 
     public void addPossession(Map<String, String> form) {
-        Possession obj = new Possession(
-                form.getOrDefault("customer", ""),
-                form.getOrDefault("unit", ""),
-                form.getOrDefault("finalInspection", "No"),
-                form.getOrDefault("utilityConnection", "No"),
-                form.getOrDefault("keyHandover", "No"),
-                form.getOrDefault("possessionLetter", "No"),
-                form.getOrDefault("status", "Ready"),
-                form.getOrDefault("remarks", "")
-        );
         try (Connection conn = openConnection()) {
-            insertPossession(conn, obj);
+            String sql = "INSERT INTO possessions (customer, unit, finalInspection, utilityConnection, keyHandover, possessionLetter, status, remarks, bookingId, possessionDate, overallStatus, createdBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, form.getOrDefault("customer", ""));
+                ps.setString(2, form.getOrDefault("unit", ""));
+                ps.setString(3, form.getOrDefault("finalInspection", "No"));
+                ps.setString(4, form.getOrDefault("utilityConnection", "No"));
+                ps.setString(5, form.getOrDefault("keyHandover", "No"));
+                ps.setString(6, form.getOrDefault("possessionLetter", "No"));
+                ps.setString(7, form.getOrDefault("status", "Ready"));
+                ps.setString(8, form.getOrDefault("remarks", ""));
+                ps.setString(9, form.getOrDefault("bookingId", ""));
+                ps.setString(10, form.getOrDefault("possessionDate", ""));
+                ps.setString(11, form.getOrDefault("overallStatus", form.getOrDefault("status", "READY")));
+                ps.setString(12, form.getOrDefault("createdBy", ""));
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
     }
 
     public void updatePossession(long id, Map<String, String> form) {
-        String sql = "UPDATE possessions SET customer = ?, unit = ?, finalInspection = ?, utilityConnection = ?, keyHandover = ?, possessionLetter = ?, status = ?, remarks = ? WHERE id = ?";
+        String sql = "UPDATE possessions SET customer = ?, unit = ?, finalInspection = ?, utilityConnection = ?, keyHandover = ?, possessionLetter = ?, status = ?, remarks = ?, bookingId = ?, possessionDate = ?, overallStatus = ?, createdBy = ? WHERE id = ?";
         try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, form.getOrDefault("customer", ""));
             ps.setString(2, form.getOrDefault("unit", ""));
@@ -1360,7 +1729,11 @@ public class DataStore {
             ps.setString(6, form.getOrDefault("possessionLetter", "No"));
             ps.setString(7, form.getOrDefault("status", "Ready"));
             ps.setString(8, form.getOrDefault("remarks", ""));
-            ps.setLong(9, id);
+            ps.setString(9, form.getOrDefault("bookingId", ""));
+            ps.setString(10, form.getOrDefault("possessionDate", ""));
+            ps.setString(11, form.getOrDefault("overallStatus", form.getOrDefault("status", "READY")));
+            ps.setString(12, form.getOrDefault("createdBy", ""));
+            ps.setLong(13, id);
             requireUpdated(ps.executeUpdate(), "Possession not found.");
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
@@ -1372,24 +1745,34 @@ public class DataStore {
     }
 
     public void addSupportTicket(Map<String, String> form) {
-        SupportTicket obj = new SupportTicket(
-                form.getOrDefault("customer", ""),
-                form.getOrDefault("unit", ""),
-                form.getOrDefault("category", ""),
-                form.getOrDefault("priority", "Normal"),
-                form.getOrDefault("status", "Open"),
-                form.getOrDefault("assignedTo", ""),
-                form.getOrDefault("description", "")
-        );
         try (Connection conn = openConnection()) {
-            insertSupportTicket(conn, obj);
+            String sql = "INSERT INTO supporttickets (customer, unit, category, priority, status, assignedTo, description, bookingId, ticketNumber, type, subject, createdDate, dueDate, resolution, closedDate, createdBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, form.getOrDefault("customer", ""));
+                ps.setString(2, form.getOrDefault("unit", ""));
+                ps.setString(3, form.getOrDefault("category", form.getOrDefault("type", "")));
+                ps.setString(4, form.getOrDefault("priority", "Normal"));
+                ps.setString(5, form.getOrDefault("status", "Open"));
+                ps.setString(6, form.getOrDefault("assignedTo", ""));
+                ps.setString(7, form.getOrDefault("description", ""));
+                ps.setString(8, form.getOrDefault("bookingId", ""));
+                ps.setString(9, form.getOrDefault("ticketNumber", ""));
+                ps.setString(10, form.getOrDefault("type", form.getOrDefault("category", "")));
+                ps.setString(11, form.getOrDefault("subject", ""));
+                ps.setString(12, form.getOrDefault("createdDate", LocalDate.now().toString()));
+                ps.setString(13, form.getOrDefault("dueDate", ""));
+                ps.setString(14, form.getOrDefault("resolution", ""));
+                ps.setString(15, form.getOrDefault("closedDate", ""));
+                ps.setString(16, form.getOrDefault("createdBy", ""));
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
     }
 
     public void updateSupportTicket(long id, Map<String, String> form) {
-        String sql = "UPDATE supporttickets SET customer = ?, unit = ?, category = ?, priority = ?, status = ?, assignedTo = ?, description = ? WHERE id = ?";
+        String sql = "UPDATE supporttickets SET customer = ?, unit = ?, category = ?, priority = ?, status = ?, assignedTo = ?, description = ?, bookingId = ?, ticketNumber = ?, type = ?, subject = ?, dueDate = ?, resolution = ?, closedDate = ?, updatedBy = ? WHERE id = ?";
         try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, form.getOrDefault("customer", ""));
             ps.setString(2, form.getOrDefault("unit", ""));
@@ -1398,7 +1781,15 @@ public class DataStore {
             ps.setString(5, form.getOrDefault("status", "Open"));
             ps.setString(6, form.getOrDefault("assignedTo", ""));
             ps.setString(7, form.getOrDefault("description", ""));
-            ps.setLong(8, id);
+            ps.setString(8, form.getOrDefault("bookingId", ""));
+            ps.setString(9, form.getOrDefault("ticketNumber", ""));
+            ps.setString(10, form.getOrDefault("type", form.getOrDefault("category", "")));
+            ps.setString(11, form.getOrDefault("subject", ""));
+            ps.setString(12, form.getOrDefault("dueDate", ""));
+            ps.setString(13, form.getOrDefault("resolution", ""));
+            ps.setString(14, form.getOrDefault("closedDate", ""));
+            ps.setString(15, form.getOrDefault("createdBy", ""));
+            ps.setLong(16, id);
             requireUpdated(ps.executeUpdate(), "Support ticket not found.");
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
@@ -1410,21 +1801,25 @@ public class DataStore {
     }
 
     public void addEmployee(Map<String, String> form) {
-        Employee obj = new Employee(
-                form.getOrDefault("employeeId", ""),
-                form.getOrDefault("name", ""),
-                form.getOrDefault("department", ""),
-                form.getOrDefault("designation", ""),
-                form.getOrDefault("mobile", ""),
-                form.getOrDefault("email", ""),
-                form.getOrDefault("dateOfJoining", ""),
-                form.getOrDefault("salaryStructure", ""),
-                form.getOrDefault("bankDetails", ""),
-                form.getOrDefault("identityDetails", ""),
-                form.getOrDefault("statutoryDetails", "")
-        );
         try (Connection conn = openConnection()) {
-            insertEmployee(conn, obj);
+            String sql = "INSERT INTO employees (employeeId, name, department, designation, mobile, email, dateOfJoining, salaryStructure, bankDetails, identityDetails, statutoryDetails, panNumber, aadhaarNumber, pfEsicDetails) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, form.getOrDefault("employeeId", ""));
+                ps.setString(2, form.getOrDefault("name", ""));
+                ps.setString(3, form.getOrDefault("department", ""));
+                ps.setString(4, form.getOrDefault("designation", ""));
+                ps.setString(5, form.getOrDefault("mobile", ""));
+                ps.setString(6, form.getOrDefault("email", ""));
+                ps.setString(7, form.getOrDefault("dateOfJoining", ""));
+                ps.setString(8, form.getOrDefault("salaryStructure", ""));
+                ps.setString(9, form.getOrDefault("bankDetails", ""));
+                ps.setString(10, form.getOrDefault("identityDetails", ""));
+                ps.setString(11, form.getOrDefault("statutoryDetails", ""));
+                ps.setString(12, form.getOrDefault("panNumber", ""));
+                ps.setString(13, form.getOrDefault("aadhaarNumber", ""));
+                ps.setString(14, form.getOrDefault("pfEsicDetails", ""));
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
@@ -1454,7 +1849,7 @@ public class DataStore {
     }
 
     public void updateEmployee(long id, Map<String, String> form) {
-        String sql = "UPDATE employees SET employeeId = ?, name = ?, department = ?, designation = ?, mobile = ?, email = ?, dateOfJoining = ?, salaryStructure = ?, bankDetails = ?, identityDetails = ?, statutoryDetails = ? WHERE id = ?";
+        String sql = "UPDATE employees SET employeeId = ?, name = ?, department = ?, designation = ?, mobile = ?, email = ?, dateOfJoining = ?, salaryStructure = ?, bankDetails = ?, identityDetails = ?, statutoryDetails = ?, panNumber = ?, aadhaarNumber = ?, pfEsicDetails = ? WHERE id = ?";
         try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, form.getOrDefault("employeeId", ""));
             ps.setString(2, form.getOrDefault("name", ""));
@@ -1467,7 +1862,10 @@ public class DataStore {
             ps.setString(9, form.getOrDefault("bankDetails", ""));
             ps.setString(10, form.getOrDefault("identityDetails", ""));
             ps.setString(11, form.getOrDefault("statutoryDetails", ""));
-            ps.setLong(12, id);
+            ps.setString(12, form.getOrDefault("panNumber", ""));
+            ps.setString(13, form.getOrDefault("aadhaarNumber", ""));
+            ps.setString(14, form.getOrDefault("pfEsicDetails", ""));
+            ps.setLong(15, id);
             requireUpdated(ps.executeUpdate(), "Employee not found.");
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
@@ -1570,7 +1968,7 @@ public class DataStore {
         if (gross.isBlank()) {
             gross = String.valueOf(b + h + i + bo);
         }
-        if (net.isBlank() && !gross.isBlank() && !deductions.isBlank()) {
+        if (net.isBlank() && !gross.isBlank()) {
             net = String.valueOf(Long.parseLong(gross) - d);
         } else if (deductions.isBlank() && !gross.isBlank() && !net.isBlank()) {
             deductions = String.valueOf(Long.parseLong(gross) - Long.parseLong(net));
@@ -1592,7 +1990,18 @@ public class DataStore {
                 form.getOrDefault("paymentStatus", "")
         );
         try (Connection conn = openConnection()) {
-            insertSalaryPayment(conn, obj);
+            long salaryId = insertSalaryPayment(conn, obj);
+            String extraSql = "UPDATE salarypayments SET commission = ?, pf = ?, esic = ?, professionalTax = ?, advanceSalary = ?, loanRecovery = ? WHERE id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(extraSql)) {
+                ps.setString(1, form.getOrDefault("commission", ""));
+                ps.setString(2, form.getOrDefault("pf", ""));
+                ps.setString(3, form.getOrDefault("esic", ""));
+                ps.setString(4, form.getOrDefault("professionalTax", ""));
+                ps.setString(5, form.getOrDefault("advanceSalary", ""));
+                ps.setString(6, form.getOrDefault("loanRecovery", ""));
+                ps.setLong(7, salaryId);
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
         }
@@ -1616,13 +2025,13 @@ public class DataStore {
         if (gross.isBlank()) {
             gross = String.valueOf(b + h + i + bo);
         }
-        if (net.isBlank() && !gross.isBlank() && !deductions.isBlank()) {
+        if (net.isBlank() && !gross.isBlank()) {
             net = String.valueOf(Long.parseLong(gross) - d);
         } else if (deductions.isBlank() && !gross.isBlank() && !net.isBlank()) {
             deductions = String.valueOf(Long.parseLong(gross) - Long.parseLong(net));
         }
         
-        String sql = "UPDATE salarypayments SET employeeId = ?, employeeName = ?, salaryMonth = ?, basicSalary = ?, hra = ?, incentives = ?, bonus = ?, deductions = ?, grossSalary = ?, netSalary = ?, paymentDate = ?, paymentMode = ?, paymentStatus = ? WHERE id = ?";
+        String sql = "UPDATE salarypayments SET employeeId = ?, employeeName = ?, salaryMonth = ?, basicSalary = ?, hra = ?, incentives = ?, bonus = ?, deductions = ?, grossSalary = ?, netSalary = ?, paymentDate = ?, paymentMode = ?, paymentStatus = ?, commission = ?, pf = ?, esic = ?, professionalTax = ?, advanceSalary = ?, loanRecovery = ? WHERE id = ?";
         try (Connection conn = openConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, form.getOrDefault("employeeId", ""));
             ps.setString(2, form.getOrDefault("employeeName", ""));
@@ -1637,7 +2046,13 @@ public class DataStore {
             ps.setString(11, form.getOrDefault("paymentDate", ""));
             ps.setString(12, form.getOrDefault("paymentMode", ""));
             ps.setString(13, form.getOrDefault("paymentStatus", ""));
-            ps.setLong(14, id);
+            ps.setString(14, form.getOrDefault("commission", ""));
+            ps.setString(15, form.getOrDefault("pf", ""));
+            ps.setString(16, form.getOrDefault("esic", ""));
+            ps.setString(17, form.getOrDefault("professionalTax", ""));
+            ps.setString(18, form.getOrDefault("advanceSalary", ""));
+            ps.setString(19, form.getOrDefault("loanRecovery", ""));
+            ps.setLong(20, id);
             requireUpdated(ps.executeUpdate(), "Salary payment not found.");
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);
@@ -2150,6 +2565,24 @@ public class DataStore {
                 list.add(new Booking(
                     rs.getLong("id"), rs.getString("customer"), rs.getString("bookingAmount"), rs.getString("bookingDate"), rs.getString("unit"), rs.getString("floor"), rs.getString("flatType"), rs.getString("status")
                 ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace(); throw mapSaveError(e);
+        }
+        return list;
+    }
+
+    public List<DocumentRecord> getDocuments() {
+        List<DocumentRecord> list = new ArrayList<>();
+        String sql = "SELECT * FROM documents ORDER BY customerId, documentType, version DESC, id DESC";
+        try (Connection conn = openConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                list.add(new DocumentRecord(
+                        rs.getLong("id"), rs.getString("customerId"), rs.getString("customer"),
+                        rs.getString("bookingId"), rs.getString("documentType"), rs.getString("originalFileName"),
+                        rs.getString("storedFileName"), rs.getString("filePath"), rs.getString("fileType"),
+                        rs.getLong("fileSize"), rs.getString("verificationStatus"), rs.getString("uploadedBy"),
+                        rs.getString("uploadedDate"), rs.getInt("version")));
             }
         } catch (SQLException e) {
             e.printStackTrace(); throw mapSaveError(e);

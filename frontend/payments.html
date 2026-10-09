@@ -14,11 +14,17 @@
       <input type="hidden" name="id" value="">
       <div class="form-grid">
         <label>Customer Name<input name="customer" required></label>
+        <label>Booking ID<input name="bookingId"></label>
+        <label>Unit Number<input name="unit"></label>
         <label>Installment Type<select name="installmentType"><option>Booking Amount</option><option>Agreement Payment</option><option>Slab Payment</option><option>Final Payment</option></select></label>
         <label>Total Cost<input name="totalCost"></label>
         <label>Paid Amount<input name="paidAmount"></label>
         <label>Pending Amount<input name="pendingAmount" readonly></label>
         <label>Due Date<input name="dueDate" type="date"></label>
+        <label>Payment Date<input name="paymentDate" type="date" data-default="today"></label>
+        <label>Payment Mode<select name="paymentMode"><option>Bank Transfer</option><option>UPI</option><option>Cheque</option><option>Cash</option></select></label>
+        <label>Transaction / Reference Number<input name="transactionReference"></label>
+        <label>Payment Status<select name="paymentStatus"><option>PENDING</option><option>PARTIALLY_PAID</option><option>PAID</option><option>OVERDUE</option></select></label>
       </div>
       <label>Payment History / Remarks<textarea name="history"></textarea></label>
       <button class="button" type="submit">Save Payment</button>

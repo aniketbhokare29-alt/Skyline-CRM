@@ -12,17 +12,22 @@
     <form class="form" id="documents-form" data-endpoint="documents" data-redirect="documents.html" enctype="multipart/form-data">
       <input type="hidden" name="id">
       <div class="form-grid">
+        <label>Customer ID<input name="customerId" placeholder="CUS-001" required></label>
         <label>Customer Name<input name="customer" required></label>
-        <label>PAN Card<input name="panCard" type="file" accept="image/*,.pdf"></label>
-        <label>Aadhaar Card<input name="aadhaarCard" type="file" accept="image/*,.pdf"></label>
-        <label>Passport Photo<input name="passportPhoto" type="file" accept="image/*,.pdf"></label>
-        <label>Address Proof<input name="addressProof" type="file" accept="image/*,.pdf"></label>
-        <label>Income Proof<input name="incomeProof" type="file" accept="image/*,.pdf"></label>
-        <label>Bank Statement<input name="bankStatement" type="file" accept="image/*,.pdf"></label>
+        <label>Booking ID<input name="bookingId"></label>
+        <label>Document Type<input name="documentType" placeholder="PAN, Aadhaar, income proof"></label>
+        <label>Verification Status<select name="verificationStatus"><option>PENDING</option><option>VERIFIED</option><option>REJECTED</option><option>EXPIRED</option></select></label>
+        <label>PAN Card<input name="panCard" type="file" accept="image/*,.pdf,.html,.txt"></label>
+        <label>Aadhaar Card<input name="aadhaarCard" type="file" accept="image/*,.pdf,.html,.txt"></label>
+        <label>Passport Photo<input name="passportPhoto" type="file" accept="image/*,.pdf,.html,.txt"></label>
+        <label>Address Proof<input name="addressProof" type="file" accept="image/*,.pdf,.html,.txt"></label>
+        <label>Income Proof<input name="incomeProof" type="file" accept="image/*,.pdf,.html,.txt"></label>
+        <label>Bank Statement<input name="bankStatement" type="file" accept="image/*,.pdf,.html,.txt"></label>
       </div>
+      <label>Remarks<textarea name="remarks"></textarea></label>
       <button class="button" type="submit">Save Documents</button>
     </form>
-    <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>PAN</th><th>Aadhaar</th><th>Photo</th><th>Address Proof</th><th>Income Proof</th><th>Bank Statement</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+    <section class="section table-wrap"><table><thead><tr><th>Customer ID</th><th>Customer</th><th>Booking ID</th><th>Document Type</th><th>File</th><th>Original Name</th><th>Status</th><th>Uploaded By</th><th>Uploaded Date</th><th>Version</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
   </div></div>
   <script src="js/api.js"></script>
   <script src="js/ui.js"></script>

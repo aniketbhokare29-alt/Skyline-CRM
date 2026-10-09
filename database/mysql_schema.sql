@@ -37,6 +37,22 @@ CREATE TABLE IF NOT EXISTS documentcollections (
   customer VARCHAR(255), panCard VARCHAR(255), aadhaarCard VARCHAR(255), passportPhoto VARCHAR(255),
   addressProof VARCHAR(255), incomeProof VARCHAR(255), bankStatement VARCHAR(255)
 );
+CREATE TABLE IF NOT EXISTS documents (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  customerId VARCHAR(191) NOT NULL,
+  customer VARCHAR(255),
+  bookingId VARCHAR(191),
+  documentType VARCHAR(64) NOT NULL,
+  originalFileName VARCHAR(255),
+  storedFileName VARCHAR(255),
+  filePath VARCHAR(500) NOT NULL,
+  fileType VARCHAR(191),
+  fileSize BIGINT NOT NULL DEFAULT 0,
+  verificationStatus VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+  uploadedBy VARCHAR(191),
+  uploadedDate VARCHAR(100),
+  version INT NOT NULL DEFAULT 1
+);
 CREATE TABLE IF NOT EXISTS loans (
   customer VARCHAR(255), bankName VARCHAR(255), loanAmount VARCHAR(255), emi VARCHAR(255),
   sanctionDate VARCHAR(255), status VARCHAR(255)

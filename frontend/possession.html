@@ -14,11 +14,14 @@
       <div class="form-grid">
         <label>Customer Name<input name="customer" required></label>
         <label>Unit Number<input name="unit" required></label>
+        <label>Booking ID<input name="bookingId"></label>
         <label class="checkline"><input name="finalInspection" type="checkbox" value="Yes"> Final Inspection</label>
         <label class="checkline"><input name="utilityConnection" type="checkbox" value="Yes"> Utility Connection</label>
         <label class="checkline"><input name="keyHandover" type="checkbox" value="Yes"> Key Handover</label>
         <label class="checkline"><input name="possessionLetter" type="checkbox" value="Yes"> Possession Letter</label>
         <label>Status<select name="status"><option>Ready</option><option>Delivered</option></select></label>
+        <label>Possession Date<input name="possessionDate" type="date"></label>
+        <label>Overall Status<select name="overallStatus"><option>READY</option><option>DELIVERED</option></select></label>
       </div>
       <label>Remarks<textarea name="remarks" placeholder="Pending work, handover notes, customer confirmation"></textarea></label>
       <button class="button" type="submit">Save Possession</button>

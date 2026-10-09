@@ -18,6 +18,7 @@
       <input type="hidden" name="id">
       <div class="form-grid">
         <label>Customer Name<input name="customer" required></label>
+        <label>Booking / Lead ID<input name="bookingId"></label>
         <label>Visit Date<input name="visitDate" type="date" data-default="today"></label>
         <label>Visit Time<input name="visitTime" type="time" data-default="time"></label>
         <label>Pickup Required?
@@ -25,10 +26,11 @@
         </label>
         <label>Executive<input name="executive"></label>
         <label>Status
-          <select name="status"><option>Scheduled</option><option>Visited</option><option>Rescheduled</option><option>No Show</option></select>
+          <select name="status"><option>SCHEDULED</option><option>VISITED</option><option>RESCHEDULED</option><option>NO_SHOW</option><option>CANCELLED</option></select>
         </label>
       </div>
       <label>Customer Feedback<textarea name="feedback" placeholder="Interest level, preferred unit, pricing concerns"></textarea></label>
+      <label>Remarks<textarea name="remarks" placeholder="Pickup notes or visit remarks"></textarea></label>
       <button class="button" type="submit">Save Site Visit</button>
     </form>
     <section class="section table-wrap">

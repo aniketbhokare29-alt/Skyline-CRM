@@ -14,12 +14,18 @@
       <div class="form-grid">
         <label>Customer Name<input name="customer" required></label>
         <label>Unit Number<input name="unit"></label>
-        <label>Category<select name="category"><option>Maintenance</option><option>Complaint</option><option>Service Request</option><option>Documentation</option><option>Referral</option></select></label>
+        <label>Booking ID<input name="bookingId"></label>
+        <label>Ticket Number<input name="ticketNumber"></label>
+        <label>Type<select name="type"><option>MAINTENANCE</option><option>COMPLAINT</option><option>SERVICE_REQUEST</option><option>DOCUMENTATION</option><option>REFERRAL</option></select></label>
+        <label>Subject<input name="subject"></label>
         <label>Priority<select name="priority"><option>Normal</option><option>High</option><option>Urgent</option></select></label>
-        <label>Status<select name="status"><option>Open</option><option>In Progress</option><option>Resolved</option></select></label>
+        <label>Status<select name="status"><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option><option>CANCELLED</option></select></label>
         <label>Assigned To<input name="assignedTo"></label>
+        <label>Created Date<input name="createdDate" type="date" data-default="today"></label>
+        <label>Due Date<input name="dueDate" type="date"></label>
       </div>
       <label>Description<textarea name="description" placeholder="Customer issue, requested action, next step"></textarea></label>
+      <label>Resolution<textarea name="resolution"></textarea></label>
       <button class="button" type="submit">Save Ticket</button>
     </form>
     <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>Unit</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Description</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>

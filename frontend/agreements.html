@@ -14,11 +14,14 @@
       <div class="form-grid">
         <label>Customer Name<input name="customer" required></label>
         <label>Unit Number<input name="unit" required></label>
+        <label>Booking ID<input name="bookingId"></label>
         <label>Agreement Date<input name="agreementDate" type="date"></label>
         <label>Stamp Duty<input name="stampDuty"></label>
         <label>Registration Date<input name="registrationDate" type="date"></label>
         <label>Registration Number<input name="registrationNumber"></label>
+        <label>Status<select name="agreementStatus"><option>PENDING</option><option>EXECUTED</option><option>CANCELLED</option></select></label>
       </div>
+      <label>Remarks<textarea name="remarks"></textarea></label>
       <button class="button" type="submit">Save Agreement</button>
     </form>
     <section class="section table-wrap"><table><thead><tr><th>Customer</th><th>Unit</th><th>Agreement Date</th><th>Stamp Duty</th><th>Registration Number</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>

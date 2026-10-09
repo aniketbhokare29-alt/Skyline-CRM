@@ -17,14 +17,16 @@
     <form class="form" id="property-form" data-endpoint="properties" data-redirect="properties.html">
       <input type="hidden" name="id">
       <div class="form-grid">
+        <label>Project / Property<input name="projectName"></label>
         <label>Unit Number<input name="unit" required></label>
         <label>Wing<input name="wing" required></label>
         <label>Floor<input name="floor" required></label>
         <label>Flat Type<select name="flatType"><option>1 BHK</option><option>2 BHK</option><option>3 BHK</option><option>4 BHK</option></select></label>
         <label>Carpet / Built-up Area<input name="area" placeholder="650 / 850 sq ft"></label>
+        <label>Built-up Area<input name="builtUpArea" placeholder="850 sq ft"></label>
         <label>Price<input name="price" placeholder="6500000"></label>
         <label>Parking<select name="parking"><option>Yes</option><option>No</option></select></label>
-        <label>Availability<select name="availability"><option>Available</option><option>Booked</option><option>Sold</option></select></label>
+        <label>Availability<select name="availability"><option>AVAILABLE</option><option>RESERVED</option><option>SOLD</option></select></label>
       </div>
       <label>Amenities<textarea name="amenities" placeholder="Lift, security, garden, clubhouse"></textarea></label>
       <button class="button" type="submit">Save Property</button>
