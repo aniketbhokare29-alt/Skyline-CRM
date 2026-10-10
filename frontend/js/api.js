@@ -4,10 +4,14 @@
  * All backend communication happens here. Uses fetch() only, no libraries.
  */
 
-/* Same host as the page, API port 8080 — works for localhost, 127.0.0.1 or LAN IP. */
-const API_BASE = (typeof location !== 'undefined' && location.hostname
-  ? location.protocol + '//' + location.hostname + ':8080/api'
-  : 'http://localhost:8080/api');
+/* Use the separate local API during development and same-origin API in deployment. */
+const API_BASE = (typeof window !== 'undefined' && window.CRM_API_BASE
+  ? window.CRM_API_BASE
+  : typeof location !== 'undefined' && location.hostname
+    ? ((location.port === '5500' || location.port === '5501')
+      ? location.protocol + '//' + location.hostname + ':8080/api'
+      : location.origin + '/api')
+    : 'http://localhost:8080/api');
 const TOKEN_KEY = 'crm_session';
 
 const Api = {

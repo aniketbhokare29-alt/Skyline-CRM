@@ -1,0 +1,9 @@
+.git
+.m2
+build
+target
+uploads
+output
+latex-report
+tmp
+*.log

@@ -9,6 +9,8 @@ import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
+import java.net.URLDecoder;
 import java.util.Set;
 import java.util.List;
 import java.util.Map;
@@ -17,8 +19,9 @@ import java.util.concurrent.Executors;
 import static com.saivandan.crm.Utils.send;
 
 public class App {
-    private static final int PORT = 8080;
-    private static final Path UPLOAD_DIR = Paths.get("uploads").toAbsolutePath().normalize();
+    private static final int PORT = settingInt("PORT", 8080);
+    private static final Path UPLOAD_DIR = Paths.get(setting("CRM_UPLOAD_DIR", "uploads")).toAbsolutePath().normalize();
+    private static final Path FRONTEND_DIR = Paths.get(setting("CRM_FRONTEND_DIR", "frontend")).toAbsolutePath().normalize();
 
     /** Origin of the static frontend that is allowed to call this API. */
     private static final List<String> ALLOWED_ORIGINS = List.of(
@@ -36,6 +39,19 @@ public class App {
     );
 
     public static final DataStore STORE = new DataStore();
+
+    private static String setting(String name, String fallback) {
+        String value = System.getenv(name);
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private static int settingInt(String name, int fallback) {
+        try {
+            return Integer.parseInt(setting(name, String.valueOf(fallback)));
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
 
     public static void main(String[] args) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
@@ -70,6 +86,10 @@ public class App {
                 return;
             }
 
+            if (method.equals("GET") && serveFrontend(exchange, path)) {
+                return;
+            }
+
             send(exchange, 404, "application/json; charset=utf-8",
                     Json.write(java.util.Map.of(
                             "error", "Not found",
@@ -81,6 +101,39 @@ public class App {
             ex.printStackTrace(System.err);
             send(exchange, 500, "text/plain; charset=utf-8", "Server error. Check api.err.log for details.");
         }
+    }
+
+    private static boolean serveFrontend(HttpExchange exchange, String requestPath) throws IOException {
+        if (requestPath.startsWith("/api/") || requestPath.startsWith("/uploads/")) {
+            return false;
+        }
+        String relative = requestPath.equals("/") || requestPath.isBlank()
+                ? "index.html" : requestPath.substring(1);
+        relative = URLDecoder.decode(relative, StandardCharsets.UTF_8);
+        Path file = FRONTEND_DIR.resolve(relative).normalize();
+        if (!file.startsWith(FRONTEND_DIR) || !Files.isRegularFile(file)) {
+            return false;
+        }
+        String contentType = contentType(file);
+        byte[] content = Files.readAllBytes(file);
+        exchange.getResponseHeaders().set("Content-Type", contentType);
+        exchange.getResponseHeaders().set("Cache-Control", "no-cache");
+        exchange.sendResponseHeaders(200, content.length);
+        try (OutputStream output = exchange.getResponseBody()) {
+            output.write(content);
+        }
+        return true;
+    }
+
+    private static String contentType(Path file) throws IOException {
+        String detected = Files.probeContentType(file);
+        if (detected != null) return detected;
+        String name = file.getFileName().toString().toLowerCase();
+        if (name.endsWith(".html")) return "text/html; charset=utf-8";
+        if (name.endsWith(".css")) return "text/css; charset=utf-8";
+        if (name.endsWith(".js")) return "application/javascript; charset=utf-8";
+        if (name.endsWith(".json")) return "application/json; charset=utf-8";
+        return "application/octet-stream";
     }
 
     private static void serveUpload(HttpExchange exchange) throws IOException {
@@ -138,6 +191,8 @@ public class App {
         }
         return origin.matches("http://localhost(:\\d+)?")
                 || origin.matches("http://127\\.0\\.0\\.1(:\\d+)?")
-                || origin.matches("http://\\[::1\\](:\\d+)?");
+                || origin.matches("http://\\[::1\\](:\\d+)?")
+                || java.util.Arrays.stream(setting("CRM_ALLOWED_ORIGINS", "").split(","))
+                .map(String::trim).anyMatch(origin::equals);
     }
 }

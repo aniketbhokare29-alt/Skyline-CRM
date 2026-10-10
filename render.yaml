@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: skyline-crm
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: CRM_DB_URL
+        sync: false
+      - key: CRM_DB_USER
+        sync: false
+      - key: CRM_DB_PASSWORD
+        sync: false
+      - key: CRM_ALLOWED_ORIGINS
+        sync: false
